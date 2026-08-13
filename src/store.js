@@ -6,8 +6,7 @@ import { matchesCaptureRule, isRecentJob } from "./filter.js";
 
 /**
  * A job qualifies for the store/CSV output when it matches the capture rule
- * (remote Salesforce, non-Salesforce employer) AND was posted within the
- * configured recency window.
+ * (remote AI/ML) AND was posted within the configured recency window.
  */
 function matchesOutputRule(job) {
   return matchesCaptureRule(job) && isRecentJob(job, config.recentDays);
@@ -235,9 +234,9 @@ export function jobsBySource(source) {
 
 /**
  * Permanently remove stored jobs that no longer satisfy the output rule:
- * the capture rule (Salesforce-employer, hybrid/on-site, or no "Salesforce" in
- * title/desc) or the recency window (posted more than RECENT_DAYS ago). Used to
- * clean out legacy rows and age out stale postings.
+ * the capture rule (hybrid/on-site, or no AI/ML signal in title/desc) or the
+ * recency window (posted more than RECENT_DAYS ago). Used to clean out legacy
+ * rows and age out stale postings.
  * @returns {{ removed: number, kept: number }}
  */
 export function pruneStore() {

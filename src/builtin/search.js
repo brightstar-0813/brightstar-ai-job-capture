@@ -1,11 +1,10 @@
 /**
- * Built In — remote Salesforce jobs via search + detail scrape.
+ * Built In — remote AI jobs via search + detail scrape.
  */
 
 import { config } from "../config.js";
 import {
-  containsSalesforce,
-  isSalesforceEmployer,
+  containsAi,
   isRemoteArrangement,
   isWithinRecentDays,
   parsePostedDate,
@@ -15,9 +14,9 @@ function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-function buildSearchUrl(page = 1) {
+function buildSearchUrl(page = 1, query = config.searchQ) {
   const params = new URLSearchParams();
-  params.set("search", config.searchQ);
+  params.set("search", query);
   params.set("daysSinceUpdated", String(config.recentDays));
   if (page > 1) params.set("page", String(page));
   return `https://builtin.com/jobs/remote?${params.toString()}`;
@@ -136,45 +135,48 @@ export async function searchBuiltinJobs(browser) {
   const seen = new Set();
 
   try {
-    for (let p = 1; p <= config.maxPages; p += 1) {
-      const url = buildSearchUrl(p);
-      console.log(`[builtin] page ${p}: ${url}`);
-      await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
-      await sleep(2500 + config.delayMs);
-      const batch = await scrapeListingPage(page);
-      console.log(`[builtin] page ${p}: found ${batch.length} links`);
-      if (!batch.length) break;
-      let added = 0;
-      for (const s of batch) {
-        if (seen.has(s.id)) continue;
-        seen.add(s.id);
-        stubs.push(s);
-        added += 1;
+    const queries =
+      config.searchQueries?.length > 0
+        ? config.searchQueries
+        : [config.searchQ];
+
+    for (const query of queries) {
+      console.log(`[builtin] query="${query}"`);
+      for (let p = 1; p <= config.maxPages; p += 1) {
+        const url = buildSearchUrl(p, query);
+        console.log(`[builtin] page ${p}: ${url}`);
+        await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
+        await sleep(2500 + config.delayMs);
+        const batch = await scrapeListingPage(page);
+        console.log(`[builtin] page ${p}: found ${batch.length} links`);
+        if (!batch.length) break;
+        let added = 0;
+        for (const s of batch) {
+          if (seen.has(s.id)) continue;
+          seen.add(s.id);
+          stubs.push(s);
+          added += 1;
+        }
+        if (added === 0) break;
       }
-      if (added === 0) break;
     }
 
     const kept = [];
     let nonRemote = 0;
-    let nonSf = 0;
+    let nonAi = 0;
     let stale = 0;
-    let employer = 0;
 
     for (let i = 0; i < stubs.length; i += 1) {
       const stub = stubs[i];
       console.log(`[builtin] detail ${i + 1}/${stubs.length}: ${stub.id}`);
       try {
         const job = await scrapeDetail(page, stub);
-        if (isSalesforceEmployer(job.organization)) {
-          employer += 1;
-          continue;
-        }
         if (!isRemoteArrangement(job.work_arrangement)) {
           nonRemote += 1;
           continue;
         }
-        if (!containsSalesforce(job.title, job.description)) {
-          nonSf += 1;
+        if (!containsAi(job.title, job.description)) {
+          nonAi += 1;
           continue;
         }
         if (isWithinRecentDays(job.date_posted, config.recentDays) === false) {
@@ -189,9 +191,9 @@ export async function searchBuiltinJobs(browser) {
     }
 
     console.log(
-      `[builtin] kept ${kept.length} remote Salesforce jobs` +
-        ` (stubs=${stubs.length}, skipped employer=${employer}, non-remote=${nonRemote},` +
-        ` non-Salesforce=${nonSf}, stale=${stale})`
+      `[builtin] kept ${kept.length} remote AI jobs` +
+        ` (stubs=${stubs.length}, non-remote=${nonRemote},` +
+        ` non-AI=${nonAi}, stale=${stale})`
     );
     return { jobs: kept };
   } finally {

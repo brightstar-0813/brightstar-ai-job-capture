@@ -32,7 +32,7 @@ app.use((req, res, next) => {
 });
 
 app.get("/api/health", (_req, res) => {
-  res.json({ ok: true, service: "dice-job-capture" });
+  res.json({ ok: true, service: "ai-jobs-capture" });
 });
 
 app.get("/api/status", (_req, res) => {

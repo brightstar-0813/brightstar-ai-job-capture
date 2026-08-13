@@ -7,7 +7,10 @@
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
-$taskName = "DiceJobCapture_API_AtLogon"
+$taskName = "AIJobCapture_API_AtLogon"
+$legacyTaskNames = @(
+  "DiceJobCapture_API_AtLogon"
+)
 
 $nodeCandidates = @(
   "$env:LOCALAPPDATA\nvm\v20.12.2\node.exe",
@@ -46,8 +49,16 @@ Register-ScheduledTask `
   -Action $action `
   -Trigger $trigger `
   -Settings $settings `
-  -Description "Keep dice-job-capture local API running so JobRight Chrome extension can ingest jobs" `
+  -Description "Keep ai-jobs-capture local API running so JobRight Chrome extension can ingest jobs" `
   -Force | Out-Null
+
+foreach ($legacyTaskName in $legacyTaskNames) {
+  $legacy = Get-ScheduledTask -TaskName $legacyTaskName -ErrorAction SilentlyContinue
+  if ($legacy) {
+    Unregister-ScheduledTask -TaskName $legacyTaskName -Confirm:$false
+    Write-Host "Removed legacy task '$legacyTaskName'."
+  }
+}
 
 Write-Host "Scheduled task '$taskName' installed (At logon -> node src/server.js)."
 Write-Host "Start now:  Start-ScheduledTask -TaskName '$taskName'"

@@ -1,5 +1,5 @@
 /**
- * JobRight.ai Salesforce search — keep APPLY WITH AUTOFILL only
+ * JobRight.ai AI jobs search — keep APPLY WITH AUTOFILL only
  * (skip APPLY NOW / LinkedIn redirects).
  *
  * Jobs load via POST /swan/recommend/search (not __NEXT_DATA__.jobList).
@@ -8,8 +8,7 @@
 import fs from "fs";
 import { config } from "../config.js";
 import {
-  containsSalesforce,
-  isSalesforceEmployer,
+  containsAi,
   isLinkedinLink,
   isRemoteArrangement,
   parsePostedDate,
@@ -107,9 +106,8 @@ function mapApiJob(item) {
   };
 }
 
-function isSalesforceJob(mapped) {
-  if (isSalesforceEmployer(mapped.organization)) return false;
-  return containsSalesforce(mapped.title, mapped.description);
+function isAiJob(mapped) {
+  return containsAi(mapped.title, mapped.description);
 }
 
 /**
@@ -253,9 +251,8 @@ export async function searchJobrightJobs(browser) {
   const all = [];
   const seen = new Set();
   let linkedinSkipped = 0;
-  let employerSkipped = 0;
   let nonRemoteSkipped = 0;
-  let nonSalesforceSkipped = 0;
+  let nonAiSkipped = 0;
   let appliedSkipped = 0;
   let staleSkipped = 0;
   let expiredSkipped = 0;
@@ -320,16 +317,12 @@ export async function searchJobrightJobs(browser) {
           linkedinSkipped += 1;
           continue;
         }
-        if (isSalesforceEmployer(mapped.organization)) {
-          employerSkipped += 1;
-          continue;
-        }
         if (!isRemoteArrangement(mapped.work_arrangement)) {
           nonRemoteSkipped += 1;
           continue;
         }
-        if (!isSalesforceJob(mapped)) {
-          nonSalesforceSkipped += 1;
+        if (!isAiJob(mapped)) {
+          nonAiSkipped += 1;
           continue;
         }
         if (isWithinRecentDays(mapped.date_posted, config.recentDays) === false) {
@@ -354,10 +347,10 @@ export async function searchJobrightJobs(browser) {
   const unauthenticated = !hasAuth || (titles.length > 0 && queryOkCount === 0);
 
   console.log(
-    `[jobright] kept ${all.length} remote Salesforce jobs` +
+    `[jobright] kept ${all.length} remote AI jobs` +
       ` (titles=${titles.length}, api=${apiCount}, okQueries=${queryOkCount}/${titles.length},` +
-      ` skipped LinkedIn=${linkedinSkipped}, skipped Salesforce-employer=${employerSkipped},` +
-      ` skipped non-remote=${nonRemoteSkipped}, skipped non-Salesforce=${nonSalesforceSkipped},` +
+      ` skipped LinkedIn=${linkedinSkipped},` +
+      ` skipped non-remote=${nonRemoteSkipped}, skipped non-AI=${nonAiSkipped},` +
       ` skipped already-applied=${appliedSkipped}, skipped expired=${expiredSkipped},` +
       ` skipped stale(>${config.recentDays}d)=${staleSkipped})`
   );

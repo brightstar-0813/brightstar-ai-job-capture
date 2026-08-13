@@ -1,12 +1,11 @@
 /**
- * ZipRecruiter — best-effort remote Salesforce scrape.
+ * ZipRecruiter — best-effort remote AI scrape.
  * Often blocked by Cloudflare in headless mode; returns [] with a warning then.
  */
 
 import { config } from "../config.js";
 import {
-  containsSalesforce,
-  isSalesforceEmployer,
+  containsAi,
   isRemoteArrangement,
   isWithinRecentDays,
   parsePostedDate,
@@ -18,8 +17,12 @@ function sleep(ms) {
 
 function buildSearchUrl() {
   // SEO path tends to pass Cloudflare more often than /jobs-search?...
+  const q =
+    (config.searchQueries && config.searchQueries[0]) ||
+    config.searchQ ||
+    "AI Engineer";
   return `https://www.ziprecruiter.com/Jobs/Remote-${encodeURIComponent(
-    String(config.searchQ || "Salesforce").replace(/\s+/g, "-")
+    String(q).replace(/\s+/g, "-")
   )}`;
 }
 
@@ -157,9 +160,8 @@ export async function searchZiprecruiterJobs(browser) {
             .trim(),
         };
 
-        if (isSalesforceEmployer(job.organization)) continue;
         if (!isRemoteArrangement(job.work_arrangement)) continue;
-        if (!containsSalesforce(job.title, job.description)) continue;
+        if (!containsAi(job.title, job.description)) continue;
         if (isWithinRecentDays(job.date_posted, config.recentDays) === false) continue;
         kept.push(job);
       } catch (err) {
@@ -167,7 +169,7 @@ export async function searchZiprecruiterJobs(browser) {
       }
     }
 
-    console.log(`[ziprecruiter] kept ${kept.length} remote Salesforce jobs`);
+    console.log(`[ziprecruiter] kept ${kept.length} remote AI jobs`);
     return { jobs: kept, blocked: false };
   } finally {
     await context.close();

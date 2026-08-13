@@ -5,8 +5,11 @@
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
-$taskName = "DiceJobCapture_5am5pm"
+$taskName = "AIJobCapture_5am5pm"
 $legacyTaskNames = @(
+  "AIJobCapture_Every8Hours",
+  "AIJobCapture_Every12Hours",
+  "DiceJobCapture_5am5pm",
   "DiceJobCapture_Every8Hours",
   "DiceJobCapture_Every12Hours"
 )
@@ -53,7 +56,7 @@ Register-ScheduledTask `
   -Trigger @($triggerAm, $triggerPm) `
   -Settings $settings `
   -Principal $principal `
-  -Description "Capture remote Salesforce jobs daily at 5:00 AM and 5:00 PM" `
+  -Description "Capture remote AI jobs daily at 5:00 AM and 5:00 PM" `
   -Force | Out-Null
 
 foreach ($legacyTaskName in $legacyTaskNames) {

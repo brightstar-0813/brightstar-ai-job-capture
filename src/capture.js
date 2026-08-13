@@ -1,5 +1,5 @@
 /**
- * Capture Salesforce jobs from Dice, JobRight, Built In, Greenhouse,
+ * Capture AI jobs from Dice, JobRight, Built In, Greenhouse,
  * ZipRecruiter, and Monster. Task Scheduler / cron entrypoint.
  */
 
@@ -40,7 +40,7 @@ function ingestJobs(jobs, runId, counts, newJobs) {
     if (!matchesCaptureRule(job)) {
       counts.skippedCount += 1;
       console.log(
-        `[filter] skip ${job.id}: no Salesforce in title/JD or employer is Salesforce`
+        `[filter] skip ${job.id}: not AI-engineer–related (flexible title/JD) or not remote`
       );
       continue;
     }
@@ -78,7 +78,7 @@ export async function runCapture({ skipSlack = false } = {}) {
   const enabled = enabledSources();
 
   console.log(
-    `[capture] run #${runId} starting (q=${config.searchQ}) sources=${enabled.join(",")}`
+    `[capture] run #${runId} starting (queries=${(config.searchQueries || [config.searchQ]).join(" | ")}) sources=${enabled.join(",")}`
   );
 
   let browser;

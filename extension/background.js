@@ -11,21 +11,23 @@ const RUN_HOURS = [5, 17];
 
 /** Same role-family seeds as Playwright JOBRIGHT_TITLES (not title filters). */
 const DEFAULT_TITLES = [
-  "Salesforce Administrator",
-  "Salesforce Developer",
-  "Salesforce Consultant",
-  "Salesforce Business Analyst",
-  "Salesforce Architect",
-  "Salesforce Engineer",
-  "Salesforce Marketing Cloud",
-  "Salesforce CPQ",
-  "Salesforce Technical Lead",
-  "Salesforce Solution Architect",
-  "Salesforce Project Manager",
-  "Salesforce QA Engineer",
+  "AI Engineer",
+  "Machine Learning Engineer",
+  "ML Engineer",
+  "LLM Engineer",
+  "Generative AI Engineer",
+  "Deep Learning Engineer",
+  "MLOps Engineer",
+  "NLP Engineer",
+  "Computer Vision Engineer",
+  "AI Research Engineer",
+  "Applied Scientist",
+  "Prompt Engineer",
+  "Software Engineer AI",
+  "Software Engineer ML",
 ];
 
-function buildSearchUrl(query = "Salesforce Administrator") {
+function buildSearchUrl(query = "AI Engineer") {
   const taxonomy = encodeURIComponent(
     JSON.stringify([{ taxonomyId: "00-00-00", title: query }])
   );
@@ -67,8 +69,7 @@ async function getTitles() {
       .map((s) => s.trim())
       .filter(Boolean);
   }
-  // Prefer multi-title seeds; fall back to single searchQ only if set explicitly
-  // to something other than bare Salesforce (which returns Salesforce-company jobs).
+  // Prefer multi-title seeds; fall back to DEFAULT_TITLES.
   return DEFAULT_TITLES;
 }
 
@@ -133,6 +134,8 @@ async function scrapeTab(tabId, titles) {
             try {
               delete window.__SF_JOBRIGHT_CS_VERSION__;
               delete window.__SF_JOBRIGHT_CS_LOADED__;
+              delete window.__AI_JOBRIGHT_CS_VERSION__;
+              delete window.__AI_JOBRIGHT_CS_LOADED__;
             } catch {
               /* ignore */
             }
@@ -156,7 +159,7 @@ async function scrapeTab(tabId, titles) {
  */
 async function captureJobrightFromChrome() {
   const titles = await getTitles();
-  const url = buildSearchUrl(titles[0] || "Salesforce Administrator");
+  const url = buildSearchUrl(titles[0] || "AI Engineer");
 
   const tab = await chrome.tabs.create({ url, active: false });
   const tabId = tab.id;

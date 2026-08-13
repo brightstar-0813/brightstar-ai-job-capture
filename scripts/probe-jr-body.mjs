@@ -31,9 +31,9 @@ const out = await page.evaluate(async (variants) => {
   for (const v of variants) {
     const body = {
       searchType: "job_title",
-      value: "Salesforce Developer",
+      value: "AI Engineer",
       jobTaxonomyList: [
-        { taxonomyId: "00-00-00", title: "Salesforce Developer" },
+        { taxonomyId: "00-00-00", title: "AI Engineer" },
       ],
       country: "US",
       jobTypes: [],

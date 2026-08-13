@@ -1,5 +1,5 @@
 /**
- * Greenhouse — pull remote Salesforce jobs from a curated list of public
+ * Greenhouse — pull remote AI jobs from a curated list of public
  * company job boards via boards-api.greenhouse.io (no login required).
  *
  * Greenhouse has no global search: each employer has a board token
@@ -8,8 +8,7 @@
 
 import { config } from "../config.js";
 import {
-  containsSalesforce,
-  isSalesforceEmployer,
+  containsAi,
   isRemoteArrangement,
   isWithinRecentDays,
   parsePostedDate,
@@ -65,9 +64,8 @@ export async function searchGreenhouseJobs(_browser) {
   const boards = config.greenhouseBoards || [];
   const all = [];
   const seen = new Set();
-  let employerSkipped = 0;
   let nonRemoteSkipped = 0;
-  let nonSalesforceSkipped = 0;
+  let nonAiSkipped = 0;
   let staleSkipped = 0;
   let boardErrors = 0;
 
@@ -130,16 +128,12 @@ export async function searchGreenhouseJobs(_browser) {
         description,
       };
 
-      if (isSalesforceEmployer(mapped.organization)) {
-        employerSkipped += 1;
-        continue;
-      }
       if (!isRemoteArrangement(mapped.work_arrangement)) {
         nonRemoteSkipped += 1;
         continue;
       }
-      if (!containsSalesforce(mapped.title, mapped.description)) {
-        nonSalesforceSkipped += 1;
+      if (!containsAi(mapped.title, mapped.description)) {
+        nonAiSkipped += 1;
         continue;
       }
       if (isWithinRecentDays(mapped.date_posted, config.recentDays) === false) {
@@ -151,10 +145,10 @@ export async function searchGreenhouseJobs(_browser) {
   }
 
   console.log(
-    `[greenhouse] kept ${all.length} remote Salesforce jobs` +
+    `[greenhouse] kept ${all.length} remote AI jobs` +
       ` (boards=${boards.length}, boardErrors=${boardErrors},` +
-      ` skipped employer=${employerSkipped}, non-remote=${nonRemoteSkipped},` +
-      ` non-Salesforce=${nonSalesforceSkipped}, stale=${staleSkipped})`
+      ` non-remote=${nonRemoteSkipped},` +
+      ` non-AI=${nonAiSkipped}, stale=${staleSkipped})`
   );
 
   return { jobs: all };

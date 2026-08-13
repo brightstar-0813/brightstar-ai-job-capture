@@ -1,5 +1,5 @@
 /**
- * JobRight content script — extract remote Salesforce jobs via
+ * JobRight content script — extract remote AI jobs via
  * POST /swan/recommend/search (skip LinkedIn / applied / non-remote / expired).
  *
  * Wrapped in a guarded IIFE: this file is both a manifest content_script AND
@@ -11,32 +11,92 @@
 (function () {
   // Bump when scrape/API body changes so executeScript can replace a stale
   // injection (old code used workModel: ["Remote"] → HTTP 400).
-  const CS_VERSION = 3;
-  if (window.__SF_JOBRIGHT_CS_VERSION__ === CS_VERSION) return;
-  if (typeof window.__SF_JOBRIGHT_CS_LISTENER__ === "function") {
+  const CS_VERSION = 5;
+  if (window.__AI_JOBRIGHT_CS_VERSION__ === CS_VERSION) return;
+  if (typeof window.__AI_JOBRIGHT_CS_LISTENER__ === "function") {
     try {
-      chrome.runtime.onMessage.removeListener(window.__SF_JOBRIGHT_CS_LISTENER__);
+      chrome.runtime.onMessage.removeListener(window.__AI_JOBRIGHT_CS_LISTENER__);
     } catch {
       /* ignore */
     }
   }
-  window.__SF_JOBRIGHT_CS_VERSION__ = CS_VERSION;
-  window.__SF_JOBRIGHT_CS_LOADED__ = true;
+  window.__AI_JOBRIGHT_CS_VERSION__ = CS_VERSION;
+  window.__AI_JOBRIGHT_CS_LOADED__ = true;
 
-const SALESFORCE_RE = /\bSalesforce\b/i;
-// Salesforce as an employer (exclude), but not staffing firms whose name merely
-// contains "Salesforce".
-const SALESFORCE_EMPLOYER_RE = /^\s*salesforce(?:\.com|,?\s*inc\.?)?\s*$/i;
+const AI_TITLE_STRONG_RE = new RegExp(
+  [
+    String.raw`\bLLMs?\b`,
+    String.raw`\bGenAI\b`,
+    String.raw`\bNLP\b`,
+    String.raw`\bMLOps\b`,
+    String.raw`\bRAG\b`,
+    "artificial intelligence",
+    "machine learning",
+    "deep learning",
+    "generative[\\s-]?ai",
+    "large language model",
+    "computer vision",
+    "prompt engineer",
+    "foundation model",
+    "applied scientist",
+    "ai[\\s/-]?ml",
+    "ml[\\s/-]?ai",
+    "ai engineer",
+    "ml engineer",
+    "llm engineer",
+    "mlops engineer",
+  ].join("|"),
+  "i"
+);
 
-function containsSalesforce(title, description) {
-  return (
-    SALESFORCE_RE.test(String(title || "")) ||
-    SALESFORCE_RE.test(String(description || ""))
-  );
-}
+const AI_TITLE_TOKEN_RE = /\b(?:AI|A\.I\.|ML)\b/i;
 
-function isSalesforceEmployer(organization) {
-  return SALESFORCE_EMPLOYER_RE.test(String(organization || "").trim());
+const AI_ENG_WORK_RE = new RegExp(
+  [
+    String.raw`\bLLMs?\b`,
+    String.raw`\bGenAI\b`,
+    String.raw`\bRAG\b`,
+    String.raw`\bMLOps\b`,
+    String.raw`\bNLP\b`,
+    "large language model",
+    "generative[\\s-]?ai",
+    "foundation model",
+    "fine[\\s-]?tun(?:e|ing)",
+    "retrieval[\\s-]?augmented",
+    "prompt engineer(?:ing)?",
+    "machine learning",
+    "deep learning",
+    "computer vision",
+    "neural network",
+    "transformer model",
+    "diffusion model",
+    "reinforcement learning",
+    String.raw`\bRLHF\b`,
+    "vector (?:db|database|store|embedding)",
+    "embedding model",
+    String.raw`\bLangChain\b`,
+    String.raw`\bLlamaIndex\b`,
+    String.raw`\bHugging\s?Face\b`,
+    String.raw`\bPyTorch\b`,
+    String.raw`\bTensorFlow\b`,
+    "ai engineer",
+    "ml engineer",
+    "llm engineer",
+    "mlops engineer",
+  ].join("|"),
+  "i"
+);
+
+const ENG_OR_SCIENCE_TITLE_RE =
+  /\b(engineer|developer|scientist|researcher|architect|swe|sde|programmer|mlops)\b/i;
+
+function containsAi(title, description) {
+  const t = String(title || "");
+  const d = String(description || "");
+  if (AI_TITLE_STRONG_RE.test(t)) return true;
+  if (AI_TITLE_TOKEN_RE.test(t) && ENG_OR_SCIENCE_TITLE_RE.test(t)) return true;
+  if (ENG_OR_SCIENCE_TITLE_RE.test(t) && AI_ENG_WORK_RE.test(d)) return true;
+  return false;
 }
 
 function isRemoteArrangement(workArrangement) {
@@ -150,13 +210,12 @@ function isLinkedinApply(mapped) {
   return /linkedin\.com/i.test(link) || /linkedin\.com/i.test(url);
 }
 
-function isSalesforceJob(mapped) {
-  if (isSalesforceEmployer(mapped.organization)) return false;
-  return containsSalesforce(mapped.title, mapped.description);
+function isAiJob(mapped) {
+  return containsAi(mapped.title, mapped.description);
 }
 
 async function fetchRecommendJobs(query, count = 50) {
-  const value = query || "Salesforce";
+  const value = query || "AI Engineer";
   const body = {
     searchType: "job_title",
     value,
@@ -244,7 +303,7 @@ async function fetchAppliedJobIds() {
 }
 
 async function ensureSearch(query) {
-  const q = query || "Salesforce";
+  const q = query || "AI Engineer";
   if (/value=/i.test(location.href)) return;
   const input = document.querySelector(
     'input[placeholder*="Search" i], input[type="search"]'
@@ -265,7 +324,7 @@ async function scrapeJobrightJobs(titles) {
   const listTitles =
     Array.isArray(titles) && titles.length
       ? titles
-      : ["Salesforce Administrator"];
+      : ["AI Engineer"];
 
   const byId = new Map();
   let apiCount = 0;
@@ -313,7 +372,7 @@ async function scrapeJobrightJobs(titles) {
         continue;
       }
       if (!isRemoteArrangement(mapped.work_arrangement)) continue;
-      if (!isSalesforceJob(mapped)) continue;
+      if (!isAiJob(mapped)) continue;
       if (isWithinRecentDays(mapped.date_posted, RECENT_DAYS) === false) {
         skippedStale += 1;
         continue;
@@ -377,6 +436,6 @@ function onScrapeMessage(msg, _sender, sendResponse) {
   return true;
 }
 
-window.__SF_JOBRIGHT_CS_LISTENER__ = onScrapeMessage;
+window.__AI_JOBRIGHT_CS_LISTENER__ = onScrapeMessage;
 chrome.runtime.onMessage.addListener(onScrapeMessage);
 })();

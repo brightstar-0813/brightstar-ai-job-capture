@@ -1,13 +1,12 @@
 /**
- * Monster — best-effort remote Salesforce scrape.
+ * Monster — best-effort remote AI scrape.
  * The site often returns an empty/blocked page to headless browsers; we detect
  * that and skip cleanly rather than fail the whole capture.
  */
 
 import { config } from "../config.js";
 import {
-  containsSalesforce,
-  isSalesforceEmployer,
+  containsAi,
   isRemoteArrangement,
   isWithinRecentDays,
   parsePostedDate,
@@ -17,9 +16,9 @@ function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-function buildSearchUrl(page = 1) {
+function buildSearchUrl(page = 1, query = config.searchQ) {
   const params = new URLSearchParams();
-  params.set("q", config.searchQ);
+  params.set("q", query);
   params.set("where", "Remote");
   params.set("page", String(page));
   params.set("so", "m.h.sh");
@@ -42,7 +41,9 @@ export async function searchMonsterJobs(browser) {
 
   try {
     for (let p = 1; p <= Math.min(3, config.maxPages); p += 1) {
-      const url = buildSearchUrl(p);
+      const query =
+        (config.searchQueries && config.searchQueries[0]) || config.searchQ;
+      const url = buildSearchUrl(p, query);
       console.log(`[monster] page ${p}: ${url}`);
       await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
       await sleep(5000 + config.delayMs);
@@ -163,9 +164,8 @@ export async function searchMonsterJobs(browser) {
               .trim(),
           };
 
-          if (isSalesforceEmployer(job.organization)) continue;
           if (!isRemoteArrangement(job.work_arrangement)) continue;
-          if (!containsSalesforce(job.title, job.description)) continue;
+          if (!containsAi(job.title, job.description)) continue;
           if (isWithinRecentDays(job.date_posted, config.recentDays) === false)
             continue;
           kept.push(job);
@@ -175,7 +175,7 @@ export async function searchMonsterJobs(browser) {
       }
     }
 
-    console.log(`[monster] kept ${kept.length} remote Salesforce jobs`);
+    console.log(`[monster] kept ${kept.length} remote AI jobs`);
     return { jobs: kept, blocked: false };
   } finally {
     await context.close();

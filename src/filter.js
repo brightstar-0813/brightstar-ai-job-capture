@@ -1,25 +1,104 @@
 /**
- * Capture rule: keep a job when its title OR description contains the word
- * "Salesforce" (case-insensitive, word boundary), EXCEPT jobs whose employer is
- * Salesforce itself. The employer exclusion is what removes Salesforce-company
- * postings (whose "Salesforce is the #1 AI CRM…" boilerplate would otherwise
- * match on description); company name is never used as a positive match signal.
+ * Capture rule for AI-engineer–related roles.
+ *
+ * Titles do NOT need to say "AI Engineer" exactly. Keep when either:
+ *  1) Title looks like a related AI/ML/LLM role (LLM Engineer, ML Engineer,
+ *     Generative AI, Applied Scientist, "Software Engineer, AI/ML", …), OR
+ *  2) Title is an eng/scientist-style role AND the JD describes AI eng work
+ *     (LLMs, RAG, fine-tuning, GenAI, MLOps, …).
+ *
+ * Bare marketing "AI" on non-eng titles (e.g. sales / recruiting) is skipped.
  */
-const SALESFORCE_RE = /\bSalesforce\b/i;
 
-// Matches the Salesforce company as an employer, e.g. "Salesforce",
-// "Salesforce.com", "Salesforce, Inc." — but NOT staffing/consulting firms
-// that merely have "Salesforce" as part of a longer name.
-const SALESFORCE_EMPLOYER_RE = /^\s*salesforce(?:\.com|,?\s*inc\.?)?\s*$/i;
+/** Strong related-title phrases (exact "AI Engineer" not required). */
+const AI_TITLE_STRONG_RE = new RegExp(
+  [
+    String.raw`\bLLMs?\b`,
+    String.raw`\bGenAI\b`,
+    String.raw`\bNLP\b`,
+    String.raw`\bMLOps\b`,
+    String.raw`\bRAG\b`,
+    "artificial intelligence",
+    "machine learning",
+    "deep learning",
+    "generative[\\s-]?ai",
+    "large language model",
+    "computer vision",
+    "prompt engineer",
+    "foundation model",
+    "applied scientist",
+    "ai[\\s/-]?ml",
+    "ml[\\s/-]?ai",
+    "ai engineer",
+    "ml engineer",
+    "llm engineer",
+    "mlops engineer",
+  ].join("|"),
+  "i"
+);
 
-export function containsSalesforce(title, description) {
+/** Short tokens — only count when the title is also eng/scientist-style. */
+const AI_TITLE_TOKEN_RE = /\b(?:AI|A\.I\.|ML)\b/i;
+
+/** Stronger AI-engineering work signals in title or JD. */
+const AI_ENG_WORK_RE = new RegExp(
+  [
+    String.raw`\bLLMs?\b`,
+    String.raw`\bGenAI\b`,
+    String.raw`\bRAG\b`,
+    String.raw`\bMLOps\b`,
+    String.raw`\bNLP\b`,
+    "large language model",
+    "generative[\\s-]?ai",
+    "foundation model",
+    "fine[\\s-]?tun(?:e|ing)",
+    "retrieval[\\s-]?augmented",
+    "prompt engineer(?:ing)?",
+    "machine learning",
+    "deep learning",
+    "computer vision",
+    "neural network",
+    "transformer model",
+    "diffusion model",
+    "reinforcement learning",
+    String.raw`\bRLHF\b`,
+    "vector (?:db|database|store|embedding)",
+    "embedding model",
+    String.raw`\bLangChain\b`,
+    String.raw`\bLlamaIndex\b`,
+    String.raw`\bHugging\s?Face\b`,
+    String.raw`\bPyTorch\b`,
+    String.raw`\bTensorFlow\b`,
+    "ai engineer",
+    "ml engineer",
+    "llm engineer",
+    "mlops engineer",
+  ].join("|"),
+  "i"
+);
+
+/** Eng / applied-science style titles — needed for short-token or JD-only matches. */
+const ENG_OR_SCIENCE_TITLE_RE =
+  /\b(engineer|developer|scientist|researcher|architect|swe|sde|programmer|mlops)\b/i;
+
+/**
+ * True when title/JD indicate an AI-engineer–related role (exact title
+ * "AI Engineer" is not required).
+ */
+export function containsAi(title, description) {
   const t = String(title || "");
   const d = String(description || "");
-  return SALESFORCE_RE.test(t) || SALESFORCE_RE.test(d);
-}
 
-export function isSalesforceEmployer(organization) {
-  return SALESFORCE_EMPLOYER_RE.test(String(organization || "").trim());
+  // e.g. "LLM Engineer", "Staff ML Engineer", "Software Engineer, Generative AI"
+  if (AI_TITLE_STRONG_RE.test(t)) return true;
+
+  // e.g. "AI Platform Engineer", "ML Software Developer" — not "AI Account Exec"
+  if (AI_TITLE_TOKEN_RE.test(t) && ENG_OR_SCIENCE_TITLE_RE.test(t)) return true;
+
+  // e.g. "Senior Software Engineer" whose JD is LLM / RAG / fine-tuning work
+  if (ENG_OR_SCIENCE_TITLE_RE.test(t) && AI_ENG_WORK_RE.test(d)) return true;
+
+  return false;
 }
 
 /**
@@ -38,19 +117,16 @@ export function isRemoteArrangement(workArrangement) {
 }
 
 /**
- * Final capture decision for a job: title or description contains "Salesforce",
- * the employer is not Salesforce itself, and the role is remote (not hybrid or
- * on-site).
+ * Final capture decision: AI-engineer–related (flexible title) + remote.
  * @param {{ title?: string, description?: string, organization?: string, work_arrangement?: string }} job
  */
 export function matchesCaptureRule(job) {
   if (!job) return false;
-  if (isSalesforceEmployer(job.organization)) return false;
   if (!isRemoteArrangement(job.work_arrangement)) return false;
-  return containsSalesforce(job.title, job.description);
+  return containsAi(job.title, job.description);
 }
 
-export function filterSalesforceJobs(jobs) {
+export function filterAiJobs(jobs) {
   return (jobs || []).filter((j) => matchesCaptureRule(j));
 }
 

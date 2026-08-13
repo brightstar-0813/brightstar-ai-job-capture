@@ -15,6 +15,41 @@ function bool(name, fallback) {
   return String(raw).toLowerCase() !== "false";
 }
 
+function parseCsvList(raw, fallback) {
+  const fromEnv = String(raw || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (fromEnv.length) return fromEnv;
+  return fallback;
+}
+
+const DEFAULT_SEARCH_QUERIES = [
+  "AI Engineer",
+  "LLM Engineer",
+  "Machine Learning Engineer",
+  "Generative AI Engineer",
+  "MLOps Engineer",
+  "Applied Scientist",
+];
+
+const DEFAULT_JOBRIGHT_TITLES = [
+  "AI Engineer",
+  "Machine Learning Engineer",
+  "ML Engineer",
+  "LLM Engineer",
+  "Generative AI Engineer",
+  "Deep Learning Engineer",
+  "MLOps Engineer",
+  "NLP Engineer",
+  "Computer Vision Engineer",
+  "AI Research Engineer",
+  "Applied Scientist",
+  "Prompt Engineer",
+  "Software Engineer AI",
+  "Software Engineer ML",
+];
+
 export const config = {
   root,
   dataDir,
@@ -28,7 +63,14 @@ export const config = {
   dbPath: path.join(dataDir, process.env.STORE_FILE || "store.json"),
   slackWebhookUrl: String(process.env.SLACK_WEBHOOK_URL || "").trim(),
   port: Number(process.env.PORT || 3847),
-  searchQ: process.env.SEARCH_Q || "Salesforce",
+  /** Primary query label (logging / API status). */
+  searchQ: process.env.SEARCH_Q || "AI Engineer",
+  /**
+   * Discovery queries for Dice / Built In / Monster / ZipRecruiter.
+   * Broader than a single "AI Engineer" string so LLM / ML / GenAI listings
+   * still surface. Override with SEARCH_QUERIES (comma-separated).
+   */
+  searchQueries: parseCsvList(process.env.SEARCH_QUERIES, DEFAULT_SEARCH_QUERIES),
   maxPages: Math.max(1, Number(process.env.MAX_PAGES || 5)),
   /** Only capture/keep jobs posted within this many days (both sources). */
   recentDays: Math.max(1, Number(process.env.RECENT_DAYS || 3)),
@@ -47,7 +89,7 @@ export const config = {
   captureMonster: bool("CAPTURE_MONSTER", true),
   /**
    * Greenhouse board tokens (boards.greenhouse.io/{token}). No global search —
-   * we poll these company boards and keep remote Salesforce matches.
+   * we poll these company boards and keep remote AI/ML matches.
    */
   greenhouseBoards: String(
     process.env.GREENHOUSE_BOARDS ||
@@ -117,35 +159,14 @@ export const config = {
   ),
   jobrightMaxPages: Math.max(1, Number(process.env.JOBRIGHT_MAX_PAGES || process.env.MAX_PAGES || 5)),
   /**
-   * JobRight search SEEDS (not title filters). A plain "Salesforce" query on
-   * JobRight returns almost only jobs AT the Salesforce company, so we seed the
-   * search with several Salesforce role families to surface Salesforce-skill
-   * roles across many employers. Whether a returned job is KEPT is decided by
-   * the capture rule (word "Salesforce" in title OR description, minus the
-   * Salesforce company) — never by matching one of these seed titles — so
-   * differently-titled roles (e.g. "Software Engineer II (Salesforce)") are
-   * still captured. Broaden/tune via the JOBRIGHT_TITLES env (comma-separated).
+   * JobRight search SEEDS (not title filters). Seeds surface related AI/ML
+   * postings; keep/skip is decided by the capture rule (related title OR
+   * AI-eng JD) — exact "AI Engineer" is never required.
    */
-  jobrightTitles: String(
-    process.env.JOBRIGHT_TITLES ||
-      [
-        "Salesforce Administrator",
-        "Salesforce Developer",
-        "Salesforce Consultant",
-        "Salesforce Business Analyst",
-        "Salesforce Architect",
-        "Salesforce Engineer",
-        "Salesforce Marketing Cloud",
-        "Salesforce CPQ",
-        "Salesforce Technical Lead",
-        "Salesforce Solution Architect",
-        "Salesforce Project Manager",
-        "Salesforce QA Engineer",
-      ].join(",")
-  )
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean),
+  jobrightTitles: parseCsvList(
+    process.env.JOBRIGHT_TITLES,
+    DEFAULT_JOBRIGHT_TITLES
+  ),
 };
 
 /** Known capture source ids (used for status counts). */

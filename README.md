@@ -1,6 +1,6 @@
-# Salesforce Job Capture (multi-source)
+# AI Jobs Capture (multi-source)
 
-Capture **remote Salesforce** jobs from Dice, JobRight, Built In, Greenhouse, ZipRecruiter, and Monster **twice daily (5:00 AM and 5:00 PM local time)**, append/dedupe locally, write **dated CSVs**, and Slack-notify on new jobs.
+Capture **remote AI** jobs from Dice, JobRight, Built In, Greenhouse, ZipRecruiter, and Monster **twice daily (5:00 AM and 5:00 PM local time)**, append/dedupe locally, write **dated CSVs**, and Slack-notify on new jobs.
 
 ## What gets saved
 
@@ -11,8 +11,8 @@ Each run overwrites **one** combined CSV with the latest qualifying jobs from al
 
 Filter (applied to all sources):
 
-- **Keep:** title or JD contains the word `Salesforce`, the job is **remote only** (not hybrid/on-site), and it was **posted within the last `RECENT_DAYS` days** (default 3).
-- **Skip:** jobs at the **Salesforce** company itself, **hybrid/on-site** roles, **LinkedIn** apply/redirect links, **expired / no-longer-available** postings (Dice banner text; JobRight `isDeleted`/`hiddenJob`), and postings **older than `RECENT_DAYS`** (they also age out of the store/CSVs on each run).
+- **Keep:** AI-engineer–related remote roles — title does **not** need to be exactly `AI Engineer`. Related titles (`LLM Engineer`, `ML Engineer`, `Generative AI`, `Applied Scientist`, `Software Engineer, AI/ML`, …) are kept; so are eng/scientist titles whose JD describes LLM / RAG / fine-tuning / GenAI / MLOps work. Posted within the last `RECENT_DAYS` days (default 3).
+- **Skip:** non-eng titles with only marketing “AI”, **hybrid/on-site** roles, **LinkedIn** apply/redirect links, **expired / no-longer-available** postings (Dice banner text; JobRight `isDeleted`/`hiddenJob`), and postings **older than `RECENT_DAYS`** (they also age out of the store/CSVs on each run).
 - **Skip (already applied):** jobs you've **already applied to** — JobRight via `POST /swan/job/applied/jobs-v3`, and **Dice** via the *My Jobs → Applied* tab (needs a saved Dice login, see below). Applied jobs are skipped during capture and removed from the local store each run.
 
 ## How automation is split (recommended)
@@ -49,7 +49,7 @@ Autofill buttons only show when you are signed in. The extension opens JobRight 
 
 ## Fully automatic — daily at 5 AM and 5 PM (Windows)
 
-Install **both** scheduled tasks (Dice capture + API at logon):
+Install **both** scheduled tasks (capture + API at logon):
 
 ```bash
 npm run schedule:install
@@ -57,17 +57,17 @@ npm run schedule:install
 
 | Task | What it does |
 |------|----------------|
-| `DiceJobCapture_5am5pm` | Runs capture daily at **5:00 AM** and **5:00 PM** (local time) |
-| `DiceJobCapture_API_AtLogon` | Starts `node src/server.js` when you log in (so JobRight extension can ingest) |
+| `AIJobCapture_5am5pm` | Runs capture daily at **5:00 AM** and **5:00 PM** (local time) |
+| `AIJobCapture_API_AtLogon` | Starts `node src/server.js` when you log in (so JobRight extension can ingest) |
 
 You do **not** need to open Cursor or type `npm start` after that — just reboot/login once, stay signed in to JobRight in Chrome, and keep the extension loaded.
 
 Optional checks:
 
 ```powershell
-Get-ScheduledTask -TaskName DiceJobCapture_5am5pm, DiceJobCapture_API_AtLogon
-Start-ScheduledTask -TaskName DiceJobCapture_API_AtLogon
-Start-ScheduledTask -TaskName DiceJobCapture_5am5pm
+Get-ScheduledTask -TaskName AIJobCapture_5am5pm, AIJobCapture_API_AtLogon
+Start-ScheduledTask -TaskName AIJobCapture_API_AtLogon
+Start-ScheduledTask -TaskName AIJobCapture_5am5pm
 ```
 
 Individual installs: `npm run schedule:dice` or `npm run schedule:api`.
@@ -99,6 +99,9 @@ Then load `extension/` unpacked in Chrome.
 
 | Key | Meaning |
 |-----|---------|
+| `SEARCH_Q` | Primary query label (`AI Engineer`) |
+| `SEARCH_QUERIES` | Comma-separated discovery queries for Dice / Built In / … |
+| `JOBRIGHT_TITLES` | Comma-separated JobRight seed titles |
 | `CAPTURE_DICE` | `true`/`false` |
 | `CAPTURE_JOBRIGHT` | Playwright JobRight (`false` = use extension) |
 | `JOBRIGHT_AUTH_PATH` | Playwright login state |
@@ -110,3 +113,4 @@ Then load `extension/` unpacked in Chrome.
 
 - Personal job-hunting use; polite delays / page caps.
 - After JobRight UI changes, re-run `npm run jobright:login` if autofill jobs stop appearing.
+- Re-run `npm run schedule:install` after upgrading so Windows tasks use the new `AIJobCapture_*` names (old `DiceJobCapture_*` tasks are removed).
