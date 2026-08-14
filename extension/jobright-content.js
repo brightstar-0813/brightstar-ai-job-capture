@@ -11,7 +11,7 @@
 (function () {
   // Bump when scrape/API body changes so executeScript can replace a stale
   // injection (old code used workModel: ["Remote"] → HTTP 400).
-  const CS_VERSION = 5;
+  const CS_VERSION = 6;
   if (window.__AI_JOBRIGHT_CS_VERSION__ === CS_VERSION) return;
   if (typeof window.__AI_JOBRIGHT_CS_LISTENER__ === "function") {
     try {
@@ -23,80 +23,17 @@
   window.__AI_JOBRIGHT_CS_VERSION__ = CS_VERSION;
   window.__AI_JOBRIGHT_CS_LOADED__ = true;
 
-const AI_TITLE_STRONG_RE = new RegExp(
-  [
-    String.raw`\bLLMs?\b`,
-    String.raw`\bGenAI\b`,
-    String.raw`\bNLP\b`,
-    String.raw`\bMLOps\b`,
-    String.raw`\bRAG\b`,
-    "artificial intelligence",
-    "machine learning",
-    "deep learning",
-    "generative[\\s-]?ai",
-    "large language model",
-    "computer vision",
-    "prompt engineer",
-    "foundation model",
-    "applied scientist",
-    "ai[\\s/-]?ml",
-    "ml[\\s/-]?ai",
-    "ai engineer",
-    "ml engineer",
-    "llm engineer",
-    "mlops engineer",
-  ].join("|"),
-  "i"
-);
+const AI_FAMILY_RE =
+  /\b(?:gen(?:erative)?[\s-]?ai|agentic[\s-]?ai|llms?|a\.i\.)\b|\bai\b/i;
+const ENG_OR_DEV_RE = /\b(engineers?|developers?)\b/i;
+const NOT_AI_ENG_TITLE_RE =
+  /\b(account executive|sales|recruiter|recruiting|sourcer|customer success|marketing|product manager|program manager|project manager|designer|writer|intern(?!al)|teacher|instructor)\b/i;
 
-const AI_TITLE_TOKEN_RE = /\b(?:AI|A\.I\.|ML)\b/i;
-
-const AI_ENG_WORK_RE = new RegExp(
-  [
-    String.raw`\bLLMs?\b`,
-    String.raw`\bGenAI\b`,
-    String.raw`\bRAG\b`,
-    String.raw`\bMLOps\b`,
-    String.raw`\bNLP\b`,
-    "large language model",
-    "generative[\\s-]?ai",
-    "foundation model",
-    "fine[\\s-]?tun(?:e|ing)",
-    "retrieval[\\s-]?augmented",
-    "prompt engineer(?:ing)?",
-    "machine learning",
-    "deep learning",
-    "computer vision",
-    "neural network",
-    "transformer model",
-    "diffusion model",
-    "reinforcement learning",
-    String.raw`\bRLHF\b`,
-    "vector (?:db|database|store|embedding)",
-    "embedding model",
-    String.raw`\bLangChain\b`,
-    String.raw`\bLlamaIndex\b`,
-    String.raw`\bHugging\s?Face\b`,
-    String.raw`\bPyTorch\b`,
-    String.raw`\bTensorFlow\b`,
-    "ai engineer",
-    "ml engineer",
-    "llm engineer",
-    "mlops engineer",
-  ].join("|"),
-  "i"
-);
-
-const ENG_OR_SCIENCE_TITLE_RE =
-  /\b(engineer|developer|scientist|researcher|architect|swe|sde|programmer|mlops)\b/i;
-
-function containsAi(title, description) {
+function containsAi(title) {
   const t = String(title || "");
-  const d = String(description || "");
-  if (AI_TITLE_STRONG_RE.test(t)) return true;
-  if (AI_TITLE_TOKEN_RE.test(t) && ENG_OR_SCIENCE_TITLE_RE.test(t)) return true;
-  if (ENG_OR_SCIENCE_TITLE_RE.test(t) && AI_ENG_WORK_RE.test(d)) return true;
-  return false;
+  if (!t.trim()) return false;
+  if (NOT_AI_ENG_TITLE_RE.test(t)) return false;
+  return AI_FAMILY_RE.test(t) && ENG_OR_DEV_RE.test(t);
 }
 
 function isRemoteArrangement(workArrangement) {

@@ -12,19 +12,15 @@ const RUN_HOURS = [5, 17];
 /** Same role-family seeds as Playwright JOBRIGHT_TITLES (not title filters). */
 const DEFAULT_TITLES = [
   "AI Engineer",
-  "Machine Learning Engineer",
-  "ML Engineer",
-  "LLM Engineer",
+  "AI Developer",
+  "Senior AI Engineer",
+  "Full Stack AI Engineer",
   "Generative AI Engineer",
-  "Deep Learning Engineer",
-  "MLOps Engineer",
-  "NLP Engineer",
-  "Computer Vision Engineer",
-  "AI Research Engineer",
-  "Applied Scientist",
-  "Prompt Engineer",
-  "Software Engineer AI",
-  "Software Engineer ML",
+  "GenAI Engineer",
+  "Agentic AI Engineer",
+  "LLM Engineer",
+  "Lead AI Engineer",
+  "Principal AI Engineer",
 ];
 
 function buildSearchUrl(query = "AI Engineer") {

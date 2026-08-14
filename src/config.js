@@ -26,28 +26,24 @@ function parseCsvList(raw, fallback) {
 
 const DEFAULT_SEARCH_QUERIES = [
   "AI Engineer",
-  "LLM Engineer",
-  "Machine Learning Engineer",
+  "AI Developer",
   "Generative AI Engineer",
-  "MLOps Engineer",
-  "Applied Scientist",
+  "Full Stack AI Engineer",
+  "Agentic AI Engineer",
+  "LLM Engineer",
 ];
 
 const DEFAULT_JOBRIGHT_TITLES = [
   "AI Engineer",
-  "Machine Learning Engineer",
-  "ML Engineer",
-  "LLM Engineer",
+  "AI Developer",
+  "Senior AI Engineer",
+  "Full Stack AI Engineer",
   "Generative AI Engineer",
-  "Deep Learning Engineer",
-  "MLOps Engineer",
-  "NLP Engineer",
-  "Computer Vision Engineer",
-  "AI Research Engineer",
-  "Applied Scientist",
-  "Prompt Engineer",
-  "Software Engineer AI",
-  "Software Engineer ML",
+  "GenAI Engineer",
+  "Agentic AI Engineer",
+  "LLM Engineer",
+  "Lead AI Engineer",
+  "Principal AI Engineer",
 ];
 
 export const config = {
@@ -67,8 +63,8 @@ export const config = {
   searchQ: process.env.SEARCH_Q || "AI Engineer",
   /**
    * Discovery queries for Dice / Built In / Monster / ZipRecruiter.
-   * Broader than a single "AI Engineer" string so LLM / ML / GenAI listings
-   * still surface. Override with SEARCH_QUERIES (comma-separated).
+   * Discovery queries for AI Engineer / AI Developer family listings.
+   * Override with SEARCH_QUERIES (comma-separated).
    */
   searchQueries: parseCsvList(process.env.SEARCH_QUERIES, DEFAULT_SEARCH_QUERIES),
   maxPages: Math.max(1, Number(process.env.MAX_PAGES || 5)),
@@ -159,9 +155,8 @@ export const config = {
   ),
   jobrightMaxPages: Math.max(1, Number(process.env.JOBRIGHT_MAX_PAGES || process.env.MAX_PAGES || 5)),
   /**
-   * JobRight search SEEDS (not title filters). Seeds surface related AI/ML
-   * postings; keep/skip is decided by the capture rule (related title OR
-   * AI-eng JD) — exact "AI Engineer" is never required.
+   * JobRight search SEEDS (not title filters). Keep/skip is the capture
+   * rule: remote + AI Engineer/Developer-family title.
    */
   jobrightTitles: parseCsvList(
     process.env.JOBRIGHT_TITLES,

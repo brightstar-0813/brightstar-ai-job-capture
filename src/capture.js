@@ -40,7 +40,7 @@ function ingestJobs(jobs, runId, counts, newJobs) {
     if (!matchesCaptureRule(job)) {
       counts.skippedCount += 1;
       console.log(
-        `[filter] skip ${job.id}: not AI-engineer–related (flexible title/JD) or not remote`
+        `[filter] skip ${job.id}: not remote AI Engineer/Developer title`
       );
       continue;
     }
@@ -82,25 +82,41 @@ export async function runCapture({ skipSlack = false } = {}) {
   );
 
   let browser;
+  const swallowTransient = (err) => {
+    console.warn(`[capture] transient browser error: ${err?.message || err}`);
+  };
+  process.on("uncaughtException", swallowTransient);
+  process.on("unhandledRejection", swallowTransient);
+
   try {
     browser = await chromium.launch({ headless: config.headless });
 
     if (config.captureDice) {
-      const { jobs: stubs, appliedIds: diceApplied, unauthenticated } =
-        await searchDiceJobs(browser);
-      diceAuthExpired = !!unauthenticated;
-      console.log(`[capture] dice listings: ${stubs.length}`);
-      const details = await scrapeJobDetails(browser, stubs);
-      console.log(`[capture] dice details: ${details.length}`);
-      ingestJobs(details, runId, counts, newJobs);
+      try {
+        const { jobs: stubs, appliedIds: diceApplied, unauthenticated } =
+          await searchDiceJobs(browser);
+        diceAuthExpired = !!unauthenticated;
+        console.log(`[capture] dice listings: ${stubs.length}`);
+        const details = await scrapeJobDetails(browser, stubs);
+        console.log(`[capture] dice details: ${details.length}`);
+        ingestJobs(details, runId, counts, newJobs);
 
-      if (Array.isArray(diceApplied) && diceApplied.length) {
-        const { removed } = removeJobs(diceApplied);
-        if (removed > 0) {
-          console.log(
-            `[capture] removed ${removed} already-applied dice jobs from store`
-          );
+        if (Array.isArray(diceApplied) && diceApplied.length) {
+          const { removed } = removeJobs(diceApplied);
+          if (removed > 0) {
+            console.log(
+              `[capture] removed ${removed} already-applied dice jobs from store`
+            );
+          }
         }
+      } catch (err) {
+        console.warn(`[capture] dice failed, continuing: ${err.message}`);
+        try {
+          await browser.close();
+        } catch {
+          /* ignore */
+        }
+        browser = await chromium.launch({ headless: config.headless });
       }
     }
 
@@ -206,6 +222,8 @@ export async function runCapture({ skipSlack = false } = {}) {
     finishRun(runId, counts, error);
     return { ok: false, runId, ...counts, error };
   } finally {
+    process.off("uncaughtException", swallowTransient);
+    process.off("unhandledRejection", swallowTransient);
     if (browser) await browser.close().catch(() => {});
     running = false;
   }

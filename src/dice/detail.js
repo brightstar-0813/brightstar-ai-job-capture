@@ -202,8 +202,17 @@ export async function scrapeJobDetails(browser, stubs) {
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     viewport: { width: 1365, height: 900 },
   });
-  const page = await context.newPage();
+  let page = await context.newPage();
   const results = [];
+
+  async function resetPage() {
+    try {
+      await page.close();
+    } catch {
+      /* ignore */
+    }
+    page = await context.newPage();
+  }
 
   try {
     for (let i = 0; i < stubs.length; i += 1) {
@@ -233,6 +242,8 @@ export async function scrapeJobDetails(browser, stubs) {
         });
       } catch (err) {
         console.warn(`[detail] failed ${stub.id}: ${err.message}`);
+        // Playwright can leave the page/frame unbound after a crashy navigation.
+        await resetPage();
       }
       if (config.delayMs) await sleep(config.delayMs);
     }

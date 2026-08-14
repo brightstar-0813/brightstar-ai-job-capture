@@ -11,8 +11,8 @@ Each run overwrites **one** combined CSV with the latest qualifying jobs from al
 
 Filter (applied to all sources):
 
-- **Keep:** AI-engineer–related remote roles — title does **not** need to be exactly `AI Engineer`. Related titles (`LLM Engineer`, `ML Engineer`, `Generative AI`, `Applied Scientist`, `Software Engineer, AI/ML`, …) are kept; so are eng/scientist titles whose JD describes LLM / RAG / fine-tuning / GenAI / MLOps work. Posted within the last `RECENT_DAYS` days (default 3).
-- **Skip:** non-eng titles with only marketing “AI”, **hybrid/on-site** roles, **LinkedIn** apply/redirect links, **expired / no-longer-available** postings (Dice banner text; JobRight `isDeleted`/`hiddenJob`), and postings **older than `RECENT_DAYS`** (they also age out of the store/CSVs on each run).
+- **Keep:** **remote only** (Remote / Remote OK / Remote Solely — not hybrid or on-site) and title is an **AI Engineer / AI Developer** family role (`Senior AI Engineer`, `Full Stack AI Engineer`, `GenAI Engineer`, `Agentic AI Engineer`, `LLM Engineer`, `AI Developer`, …). Exact wording is not required. Posted within the last `RECENT_DAYS` days (default 3).
+- **Skip:** generic SWE/ML/scientist titles even if the JD mentions AI; non-eng “AI” titles (sales, recruiting, PM); **hybrid/on-site**; **LinkedIn** apply/redirect links; **expired / no-longer-available** postings; postings **older than `RECENT_DAYS`**.
 - **Skip (already applied):** jobs you've **already applied to** — JobRight via `POST /swan/job/applied/jobs-v3`, and **Dice** via the *My Jobs → Applied* tab (needs a saved Dice login, see below). Applied jobs are skipped during capture and removed from the local store each run.
 
 ## How automation is split (recommended)
