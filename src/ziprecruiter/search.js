@@ -5,7 +5,7 @@
 
 import { config } from "../config.js";
 import {
-  containsAi,
+  matchesTargetRole,
   isRemoteArrangement,
   isWithinRecentDays,
   parsePostedDate,
@@ -161,7 +161,7 @@ export async function searchZiprecruiterJobs(browser) {
         };
 
         if (!isRemoteArrangement(job.work_arrangement)) continue;
-        if (!containsAi(job.title, job.description)) continue;
+        if (!matchesTargetRole(job)) continue;
         if (isWithinRecentDays(job.date_posted, config.recentDays) === false) continue;
         kept.push(job);
       } catch (err) {

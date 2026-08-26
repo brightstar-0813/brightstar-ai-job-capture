@@ -8,11 +8,12 @@
 
 import { config } from "../config.js";
 import {
-  containsAi,
+  matchesTargetRole,
   isRemoteArrangement,
   isWithinRecentDays,
   parsePostedDate,
 } from "../filter.js";
+import { applyRegionFields } from "../geo.js";
 
 function stripHtml(html) {
   return String(html || "")
@@ -132,7 +133,7 @@ export async function searchGreenhouseJobs(_browser) {
         nonRemoteSkipped += 1;
         continue;
       }
-      if (!containsAi(mapped.title, mapped.description)) {
+      if (!matchesTargetRole(mapped)) {
         nonAiSkipped += 1;
         continue;
       }
@@ -140,15 +141,17 @@ export async function searchGreenhouseJobs(_browser) {
         staleSkipped += 1;
         continue;
       }
+      mapped.remote_restricted_to = mapped.remote_restricted_to || location;
+      applyRegionFields(mapped);
       all.push(mapped);
     }
   }
 
   console.log(
-    `[greenhouse] kept ${all.length} remote AI jobs` +
+    `[greenhouse] kept ${all.length} remote SWE/AI-ML jobs` +
       ` (boards=${boards.length}, boardErrors=${boardErrors},` +
       ` non-remote=${nonRemoteSkipped},` +
-      ` non-AI=${nonAiSkipped}, stale=${staleSkipped})`
+      ` non-role=${nonAiSkipped}, stale=${staleSkipped})`
   );
 
   return { jobs: all };

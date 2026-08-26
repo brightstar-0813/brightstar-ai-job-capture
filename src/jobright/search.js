@@ -8,7 +8,7 @@
 import fs from "fs";
 import { config } from "../config.js";
 import {
-  containsAi,
+  matchesTargetRole,
   isLinkedinLink,
   isRemoteArrangement,
   parsePostedDate,
@@ -87,7 +87,8 @@ function mapApiJob(item) {
     organization: company.companyName || "",
     location: jr.jobLocation || (jr.jobLocations || [])[0] || "",
     work_arrangement: workArrangement,
-    remote_restricted_to: "",
+    remote_restricted_to: "United States",
+    region: "US",
     experience_level: jr.jobSeniority || "",
     employment_type: jr.employmentType || "",
     salary_min: salary.min || (jr.minSalary != null ? String(jr.minSalary) : ""),
@@ -107,7 +108,7 @@ function mapApiJob(item) {
 }
 
 function isAiJob(mapped) {
-  return containsAi(mapped.title, mapped.description);
+  return matchesTargetRole(mapped);
 }
 
 /**

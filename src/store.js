@@ -3,35 +3,28 @@ import path from "path";
 import { config, CSV_HEADERS, SOURCE_IDS, CSV_SOURCE_ORDER } from "./config.js";
 import { writeCsv } from "./csv.js";
 import { matchesCaptureRule, isRecentJob } from "./filter.js";
+import { applyRegionFields, classifyRegion } from "./geo.js";
 
 /**
- * A job qualifies for the store/CSV output when it matches the capture rule
- * (remote AI Engineer/Developer-family title) AND was posted within the configured recency window.
+ * Qualifies for CSV when capture rule + recent + US/AU region.
  */
 function matchesOutputRule(job) {
-  return matchesCaptureRule(job) && isRecentJob(job, config.recentDays);
+  if (!matchesCaptureRule(job)) return false;
+  if (!isRecentJob(job, config.recentDays)) return false;
+  const region = classifyRegion(job);
+  return region === "US" || region === "AU";
 }
-
-/**
- * File-backed store (JSON) — no native deps.
- * Keeps jobs + run history for dedupe and CSV sync.
- */
 
 function ensureDataDir() {
   fs.mkdirSync(config.dataDir, { recursive: true });
 }
 
-function storePath() {
+function storeFilePath() {
   return config.storePath || path.join(config.dataDir, "store.json");
 }
 
 function defaultStore() {
-  return {
-    meta: {},
-    nextRunId: 1,
-    runs: [],
-    jobs: {},
-  };
+  return { meta: {}, nextRunId: 1, runs: [], jobs: {} };
 }
 
 let cache = null;
@@ -39,7 +32,7 @@ let cache = null;
 function load() {
   if (cache) return cache;
   ensureDataDir();
-  const p = storePath();
+  const p = storeFilePath();
   if (!fs.existsSync(p)) {
     cache = defaultStore();
     save();
@@ -59,10 +52,9 @@ function load() {
 
 function save() {
   ensureDataDir();
-  fs.writeFileSync(storePath(), JSON.stringify(cache, null, 2), "utf8");
+  fs.writeFileSync(storeFilePath(), JSON.stringify(cache, null, 2), "utf8");
 }
 
-// Keep dbPath config for compatibility; also mirror a marker file name
 export function getMeta(key, fallback = null) {
   const s = load();
   return Object.prototype.hasOwnProperty.call(s.meta, key)
@@ -123,12 +115,16 @@ export function getStatus() {
   return {
     totalJobs: jobs.length,
     ...bySource,
+    usJobs: jobs.filter((j) => classifyRegion(j) === "US").length,
+    auJobs: jobs.filter((j) => classifyRegion(j) === "AU").length,
     diceJobs: bySource.diceJobs,
     jobrightJobs: bySource.jobrightJobs,
     newJobs: jobs.filter((j) => j.status === "new").length,
     lastRun: lastRun || null,
-    csvPath: getMeta("last_csv_path"),
-    latestCsv: config.csvLatestPath,
+    csvUsPath: config.csvUsPath,
+    csvAuPath: config.csvAuPath,
+    lastCsvUs: getMeta("last_csv_us_path"),
+    lastCsvAu: getMeta("last_csv_au_path"),
     apiBase: config.apiBase,
   };
 }
@@ -136,9 +132,7 @@ export function getStatus() {
 function jobFromRow(row) {
   if (!row) return null;
   const out = {};
-  for (const h of CSV_HEADERS) {
-    out[h] = row[h] ?? "";
-  }
+  for (const h of CSV_HEADERS) out[h] = row[h] ?? "";
   return out;
 }
 
@@ -146,15 +140,17 @@ export function getJob(id) {
   return jobFromRow(load().jobs[String(id)]);
 }
 
-export function listJobs({ status, source, limit = 50 } = {}) {
+export function listJobs({ status, source, region, limit = 50 } = {}) {
   const lim = Math.max(1, Math.min(500, Number(limit) || 50));
   let rows = Object.values(load().jobs);
-  if (status) {
-    rows = rows.filter((j) => j.status === String(status));
-  }
+  if (status) rows = rows.filter((j) => j.status === String(status));
   if (source) {
     const src = String(source).toLowerCase();
     rows = rows.filter((j) => String(j.source || "").toLowerCase() === src);
+  }
+  if (region) {
+    const r = String(region).toUpperCase();
+    rows = rows.filter((j) => classifyRegion(j) === r);
   }
   rows.sort((a, b) =>
     String(b.last_seen_at || "").localeCompare(String(a.last_seen_at || ""))
@@ -171,7 +167,6 @@ export function allJobs() {
 }
 
 /**
- * Upsert a scraped job for the current run.
  * @returns {{ status: 'new'|'updated', job: object }}
  */
 export function upsertJob(scraped, runId) {
@@ -179,25 +174,27 @@ export function upsertJob(scraped, runId) {
   const now = new Date().toISOString();
   const id = String(scraped.id);
   const existing = s.jobs[id];
+  const stamped = applyRegionFields({ ...scraped });
 
   const base = {
     id,
-    title: scraped.title || "",
-    organization: scraped.organization || "",
-    location: scraped.location || "",
-    work_arrangement: scraped.work_arrangement || "",
-    remote_restricted_to: scraped.remote_restricted_to || "",
-    experience_level: scraped.experience_level || "",
-    employment_type: scraped.employment_type || "",
-    salary_min: scraped.salary_min ?? "",
-    salary_max: scraped.salary_max ?? "",
-    salary_currency: scraped.salary_currency || "USD",
-    salary_unit: scraped.salary_unit || "",
-    key_skills: scraped.key_skills || "",
-    source: scraped.source || "dice",
-    date_posted: scraped.date_posted || "",
-    url: scraped.url || "",
-    description: scraped.description || "",
+    title: stamped.title || "",
+    organization: stamped.organization || "",
+    location: stamped.location || "",
+    work_arrangement: stamped.work_arrangement || "",
+    remote_restricted_to: stamped.remote_restricted_to || "",
+    region: stamped.region || "",
+    experience_level: stamped.experience_level || "",
+    employment_type: stamped.employment_type || "",
+    salary_min: stamped.salary_min ?? "",
+    salary_max: stamped.salary_max ?? "",
+    salary_currency: stamped.salary_currency || "USD",
+    salary_unit: stamped.salary_unit || "",
+    key_skills: stamped.key_skills || "",
+    source: stamped.source || "dice",
+    date_posted: stamped.date_posted || "",
+    url: stamped.url || "",
+    description: stamped.description || "",
   };
 
   if (!existing) {
@@ -232,13 +229,6 @@ export function jobsBySource(source) {
   return allJobs().filter((j) => String(j.source || "").toLowerCase() === src);
 }
 
-/**
- * Permanently remove stored jobs that no longer satisfy the output rule:
- * the capture rule (hybrid/on-site, or title is not AI Engineer/Developer) or the
- * recency window (posted more than RECENT_DAYS ago). Used to clean out legacy
- * rows and age out stale postings.
- * @returns {{ removed: number, kept: number }}
- */
 export function pruneStore() {
   const s = load();
   const ids = Object.keys(s.jobs);
@@ -253,12 +243,6 @@ export function pruneStore() {
   return { removed, kept: Object.keys(s.jobs).length };
 }
 
-/**
- * Permanently remove stored jobs by id (e.g. jobs the user has since applied
- * to on JobRight). Ignores ids that are not present.
- * @param {Iterable<string>} ids
- * @returns {{ removed: number, kept: number }}
- */
 export function removeJobs(ids) {
   const s = load();
   let removed = 0;
@@ -273,34 +257,54 @@ export function removeJobs(ids) {
   return { removed, kept: Object.keys(s.jobs).length };
 }
 
-/**
- * Write one combined CSV with the latest qualifying jobs from all sources.
- * Overwrites `jobs_latest.csv` (or CSV_LATEST_FILE) each run.
- * @returns {{ csvPath: string, latestPath: string, count: number }}
- */
 function csvSourceRank(source) {
   const src = String(source || "").toLowerCase();
   const idx = CSV_SOURCE_ORDER.indexOf(src);
   return idx === -1 ? CSV_SOURCE_ORDER.length : idx;
 }
 
-export function syncCsv(rows = null) {
-  const all = rows || allJobs();
-  const clean = (all || []).filter((j) => matchesOutputRule(j));
-  // Source order first (JobRight last), then newest first within each source.
-  clean.sort((a, b) => {
+function sortJobs(rows) {
+  rows.sort((a, b) => {
     const bySource = csvSourceRank(a.source) - csvSourceRank(b.source);
     if (bySource !== 0) return bySource;
     return String(b.last_seen_at || b.date_posted || "").localeCompare(
       String(a.last_seen_at || a.date_posted || "")
     );
   });
+  return rows;
+}
 
-  const latestPath = config.csvLatestPath;
-  writeCsv(latestPath, clean);
-  setMeta("last_csv_path", latestPath);
-  setMeta("last_csv_latest_path", latestPath);
-  return { csvPath: latestPath, latestPath, count: clean.length };
+/**
+ * Write dual US/AU CSVs.
+ */
+export function syncCsv(rows = null) {
+  const all = rows || allJobs();
+  const clean = (all || [])
+    .filter((j) => matchesOutputRule(j))
+    .map((j) => {
+      const region = classifyRegion(j);
+      return { ...j, region: region || j.region || "" };
+    });
+
+  const usRows = sortJobs(clean.filter((j) => j.region === "US"));
+  const auRows = sortJobs(clean.filter((j) => j.region === "AU"));
+
+  writeCsv(config.csvUsPath, usRows);
+  writeCsv(config.csvAuPath, auRows);
+
+  setMeta("last_csv_us_path", config.csvUsPath);
+  setMeta("last_csv_au_path", config.csvAuPath);
+  setMeta("last_csv_path", config.csvUsPath);
+
+  return {
+    usPath: config.csvUsPath,
+    auPath: config.csvAuPath,
+    usCount: usRows.length,
+    auCount: auRows.length,
+    count: usRows.length + auRows.length,
+    csvPath: config.csvUsPath,
+    latestPath: config.csvUsPath,
+  };
 }
 
 export function closeStore() {

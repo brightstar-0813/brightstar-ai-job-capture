@@ -1,6 +1,6 @@
 /**
- * Capture AI jobs from Dice, JobRight, Built In, Greenhouse,
- * ZipRecruiter, and Monster. Task Scheduler / cron entrypoint.
+ * Capture remote SWE / AI-focused Backend / AI-ML jobs from public APIs,
+ * ATS boards, and Playwright scrapers. Dual US/AU CSV export.
  */
 
 import { chromium } from "playwright";
@@ -12,7 +12,16 @@ import { searchBuiltinJobs } from "./builtin/search.js";
 import { searchGreenhouseJobs } from "./greenhouse/search.js";
 import { searchZiprecruiterJobs } from "./ziprecruiter/search.js";
 import { searchMonsterJobs } from "./monster/search.js";
+import { searchRemotiveJobs } from "./remotive/search.js";
+import { searchJobicyJobs } from "./jobicy/search.js";
+import { searchHimalayasJobs } from "./himalayas/search.js";
+import { searchArbeitnowJobs } from "./arbeitnow/search.js";
+import { searchRemoteokJobs } from "./remoteok/search.js";
+import { searchLeverJobs } from "./lever/search.js";
+import { searchAshbyJobs } from "./ashby/search.js";
+import { searchSeekJobs } from "./seek/search.js";
 import { matchesCaptureRule } from "./filter.js";
+import { applyRegionFields, classifyRegion } from "./geo.js";
 import {
   beginRun,
   finishRun,
@@ -37,13 +46,21 @@ function ingestJobs(jobs, runId, counts, newJobs) {
       counts.skippedCount += 1;
       continue;
     }
+    applyRegionFields(job);
     if (!matchesCaptureRule(job)) {
       counts.skippedCount += 1;
       console.log(
-        `[filter] skip ${job.id}: not remote AI Engineer/Developer title`
+        `[filter] skip ${job.id}: not remote SWE/Backend+AI/AI-ML match`
       );
       continue;
     }
+    const region = classifyRegion(job);
+    if (region !== "US" && region !== "AU") {
+      counts.skippedCount += 1;
+      console.log(`[filter] skip ${job.id}: ambiguous region (not US/AU)`);
+      continue;
+    }
+    job.region = region;
     const { status, job: saved } = upsertJob(job, runId);
     if (status === "new") {
       counts.newCount += 1;
@@ -56,13 +73,31 @@ function ingestJobs(jobs, runId, counts, newJobs) {
 
 function enabledSources() {
   const out = [];
-  if (config.captureDice) out.push("dice");
-  if (config.captureJobright) out.push("jobright");
-  if (config.captureBuiltin) out.push("builtin");
+  if (config.captureRemotive) out.push("remotive");
+  if (config.captureJobicy) out.push("jobicy");
+  if (config.captureHimalayas) out.push("himalayas");
+  if (config.captureArbeitnow) out.push("arbeitnow");
+  if (config.captureRemoteok) out.push("remoteok");
   if (config.captureGreenhouse) out.push("greenhouse");
+  if (config.captureLever) out.push("lever");
+  if (config.captureAshby) out.push("ashby");
+  if (config.captureDice) out.push("dice");
+  if (config.captureBuiltin) out.push("builtin");
   if (config.captureZiprecruiter) out.push("ziprecruiter");
   if (config.captureMonster) out.push("monster");
+  if (config.captureSeek) out.push("seek");
+  if (config.captureJobright) out.push("jobright");
   return out;
+}
+
+async function runApiSource(name, fn, runId, counts, newJobs) {
+  try {
+    const { jobs } = await fn(null);
+    console.log(`[capture] ${name} jobs: ${jobs.length}`);
+    ingestJobs(jobs, runId, counts, newJobs);
+  } catch (err) {
+    console.warn(`[capture] ${name} failed, continuing: ${err.message}`);
+  }
 }
 
 export async function runCapture({ skipSlack = false } = {}) {
@@ -89,7 +124,61 @@ export async function runCapture({ skipSlack = false } = {}) {
   process.on("unhandledRejection", swallowTransient);
 
   try {
-    browser = await chromium.launch({ headless: config.headless });
+    // Public JSON APIs first (no browser)
+    if (config.captureRemotive) {
+      await runApiSource("remotive", searchRemotiveJobs, runId, counts, newJobs);
+    }
+    if (config.captureJobicy) {
+      await runApiSource("jobicy", searchJobicyJobs, runId, counts, newJobs);
+    }
+    if (config.captureHimalayas) {
+      await runApiSource(
+        "himalayas",
+        searchHimalayasJobs,
+        runId,
+        counts,
+        newJobs
+      );
+    }
+    if (config.captureArbeitnow) {
+      await runApiSource(
+        "arbeitnow",
+        searchArbeitnowJobs,
+        runId,
+        counts,
+        newJobs
+      );
+    }
+    if (config.captureRemoteok) {
+      await runApiSource("remoteok", searchRemoteokJobs, runId, counts, newJobs);
+    }
+    if (config.captureGreenhouse) {
+      await runApiSource(
+        "greenhouse",
+        searchGreenhouseJobs,
+        runId,
+        counts,
+        newJobs
+      );
+    }
+    if (config.captureLever) {
+      await runApiSource("lever", searchLeverJobs, runId, counts, newJobs);
+    }
+    if (config.captureAshby) {
+      await runApiSource("ashby", searchAshbyJobs, runId, counts, newJobs);
+    }
+
+    const needsBrowser =
+      config.captureDice ||
+      config.captureBuiltin ||
+      config.captureZiprecruiter ||
+      config.captureMonster ||
+      config.captureSeek ||
+      config.captureJobright;
+
+    if (needsBrowser) {
+      browser = await chromium.launch({ headless: config.headless });
+    }
 
     if (config.captureDice) {
       try {
@@ -121,47 +210,67 @@ export async function runCapture({ skipSlack = false } = {}) {
     }
 
     if (config.captureBuiltin) {
-      const { jobs } = await searchBuiltinJobs(browser);
-      console.log(`[capture] builtin jobs: ${jobs.length}`);
-      ingestJobs(jobs, runId, counts, newJobs);
-    }
-
-    if (config.captureGreenhouse) {
-      const { jobs } = await searchGreenhouseJobs(browser);
-      console.log(`[capture] greenhouse jobs: ${jobs.length}`);
-      ingestJobs(jobs, runId, counts, newJobs);
+      try {
+        const { jobs } = await searchBuiltinJobs(browser);
+        console.log(`[capture] builtin jobs: ${jobs.length}`);
+        ingestJobs(jobs, runId, counts, newJobs);
+      } catch (err) {
+        console.warn(`[capture] builtin failed: ${err.message}`);
+      }
     }
 
     if (config.captureZiprecruiter) {
-      const { jobs, blocked } = await searchZiprecruiterJobs(browser);
-      console.log(
-        `[capture] ziprecruiter jobs: ${jobs.length}${blocked ? " (blocked)" : ""}`
-      );
-      ingestJobs(jobs, runId, counts, newJobs);
+      try {
+        const { jobs, blocked } = await searchZiprecruiterJobs(browser);
+        console.log(
+          `[capture] ziprecruiter jobs: ${jobs.length}${blocked ? " (blocked)" : ""}`
+        );
+        ingestJobs(jobs, runId, counts, newJobs);
+      } catch (err) {
+        console.warn(`[capture] ziprecruiter failed: ${err.message}`);
+      }
     }
 
     if (config.captureMonster) {
-      const { jobs, blocked } = await searchMonsterJobs(browser);
-      console.log(
-        `[capture] monster jobs: ${jobs.length}${blocked ? " (blocked)" : ""}`
-      );
-      ingestJobs(jobs, runId, counts, newJobs);
+      try {
+        const { jobs, blocked } = await searchMonsterJobs(browser);
+        console.log(
+          `[capture] monster jobs: ${jobs.length}${blocked ? " (blocked)" : ""}`
+        );
+        ingestJobs(jobs, runId, counts, newJobs);
+      } catch (err) {
+        console.warn(`[capture] monster failed: ${err.message}`);
+      }
     }
 
-    // JobRight last — CSV export also places JobRight rows at the bottom.
-    if (config.captureJobright) {
-      const { jobs: jrJobs, auth, appliedIds } = await searchJobrightJobs(browser);
-      console.log(`[capture] jobright jobs: ${jrJobs.length}`);
-      jobrightAuthExpired = !!auth?.unauthenticated;
-      ingestJobs(jrJobs, runId, counts, newJobs);
+    if (config.captureSeek) {
+      try {
+        const { jobs } = await searchSeekJobs(browser);
+        console.log(`[capture] seek jobs: ${jobs.length}`);
+        ingestJobs(jobs, runId, counts, newJobs);
+      } catch (err) {
+        console.warn(`[capture] seek failed: ${err.message}`);
+      }
+    }
 
-      if (Array.isArray(appliedIds) && appliedIds.length) {
-        const { removed } = removeJobs(appliedIds);
-        if (removed > 0) {
-          console.log(
-            `[capture] removed ${removed} already-applied jobright jobs from store`
-          );
+    if (config.captureJobright) {
+      try {
+        const { jobs: jrJobs, auth, appliedIds } =
+          await searchJobrightJobs(browser);
+        console.log(`[capture] jobright jobs: ${jrJobs.length}`);
+        jobrightAuthExpired = !!auth?.unauthenticated;
+        ingestJobs(jrJobs, runId, counts, newJobs);
+
+        if (Array.isArray(appliedIds) && appliedIds.length) {
+          const { removed } = removeJobs(appliedIds);
+          if (removed > 0) {
+            console.log(
+              `[capture] removed ${removed} already-applied jobright jobs from store`
+            );
+          }
         }
+      } catch (err) {
+        console.warn(`[capture] jobright failed: ${err.message}`);
       }
     }
 
@@ -176,7 +285,7 @@ export async function runCapture({ skipSlack = false } = {}) {
       `[capture] done — new=${counts.newCount} updated=${counts.updatedCount} skipped=${counts.skippedCount}`
     );
     console.log(
-      `[capture] csv=${csvOut.csvPath} (rows=${csvOut.count})`
+      `[capture] us=${csvOut.usPath} (rows=${csvOut.usCount}) au=${csvOut.auPath} (rows=${csvOut.auCount})`
     );
 
     if (!skipSlack) {
@@ -187,6 +296,8 @@ export async function runCapture({ skipSlack = false } = {}) {
           source: enabled.join("+"),
           ...counts,
           newJobs,
+          usCount: csvOut.usCount,
+          auCount: csvOut.auCount,
         });
         if (jobrightAuthExpired) {
           await notifyJobrightLoginExpired({
@@ -211,10 +322,15 @@ export async function runCapture({ skipSlack = false } = {}) {
       runId,
       ...counts,
       newJobs,
+      usPath: csvOut.usPath,
+      auPath: csvOut.auPath,
+      usCount: csvOut.usCount,
+      auCount: csvOut.auCount,
       csvPath: csvOut.csvPath,
       latestPath: csvOut.latestPath,
       csvCount: csvOut.count,
-      lastCsv: getMeta("last_csv_path"),
+      lastCsvUs: getMeta("last_csv_us_path"),
+      lastCsvAu: getMeta("last_csv_au_path"),
     };
   } catch (err) {
     const error = err.message || String(err);

@@ -1,76 +1,41 @@
-# AI Jobs Capture (multi-source)
+# US/AU remote SWE + AI/ML job capture
 
-Capture **remote AI** jobs from Dice, JobRight, Built In, Greenhouse, ZipRecruiter, and Monster **twice daily (5:00 AM and 5:00 PM local time)**, append/dedupe locally, write **dated CSVs**, and Slack-notify on new jobs.
+Capture **remote** Software Engineer, **AI-focused Backend**, and **AI/ML Engineer** roles from public APIs, ATS boards, and scrapers. Export **separate US and AU CSVs** twice daily (5:00 AM and 5:00 PM local).
 
 ## What gets saved
 
-Each run overwrites **one** combined CSV with the latest qualifying jobs from all sources:
+Each run overwrites dual CSVs:
 
-- `download/jobs_latest.csv` — all sources together (`source` column marks Dice / JobRight / Built In / …)
+- `download/jobs_us_latest.csv` — US-eligible remote roles
+- `download/jobs_au_latest.csv` — AU-eligible remote roles
 - `download/store.json` — shared dedupe history
 
-Filter (applied to all sources):
+Filter (all sources):
 
-- **Keep:** **remote only** (Remote / Remote OK / Remote Solely — not hybrid or on-site) and title is an **AI Engineer / AI Developer** family role (`Senior AI Engineer`, `Full Stack AI Engineer`, `GenAI Engineer`, `Agentic AI Engineer`, `LLM Engineer`, `AI Developer`, …). Exact wording is not required. Posted within the last `RECENT_DAYS` days (default 3).
-- **Skip:** generic SWE/ML/scientist titles even if the JD mentions AI; non-eng “AI” titles (sales, recruiting, PM); **hybrid/on-site**; **LinkedIn** apply/redirect links; **expired / no-longer-available** postings; postings **older than `RECENT_DAYS`**.
-- **Skip (already applied):** jobs you've **already applied to** — JobRight via `POST /swan/job/applied/jobs-v3`, and **Dice** via the *My Jobs → Applied* tab (needs a saved Dice login, see below). Applied jobs are skipped during capture and removed from the local store each run.
+- **Keep (remote only):**
+  - **Software Engineer** title family (Senior/Staff/Principal OK)
+  - **Backend / Back-end Engineer** with AI signal in title **or** JD
+  - **AI/ML Engineer** family in title (AI, ML, LLM, GenAI, Agentic, …)
+  - Engineer/Developer title + **strong JD AI/ML keywords** (LLM, PyTorch, LangChain, RAG, …)
+- **Skip:** Data Engineer / Salesforce; non-eng titles (sales, recruiting, PM, designer, intern, …); hybrid/on-site; LinkedIn apply links; expired; older than `RECENT_DAYS` (default 3); worldwide remotes that cannot be classified as US or AU
 
-## How automation is split (recommended)
+## Sources (public APIs preferred)
 
-| Source | How it runs | Notes |
-|--------|-------------|-------|
-| **Dice** | Windows Task Scheduler | Optional login for applied-job exclusion |
-| **JobRight** | Scheduler + saved Playwright login (or Chrome extension) | Needs `npm run jobright:login` |
-| **Built In** | Scheduler (Playwright) | Reliable; remote + keyword search |
-| **Greenhouse** | Scheduler (public board API) | No login; polls curated company boards (`GREENHOUSE_BOARDS`) |
-| **ZipRecruiter** | Scheduler (Playwright) | Often Cloudflare-blocked in headless — may return 0 |
-| **Monster** | Scheduler (Playwright) | Often empty/blocked in headless — may return 0 |
-
-### Optional: skip already-applied Dice jobs
-
-Dice capture works logged-out, but to also **exclude jobs you've already applied to on Dice**, save a one-time session:
-
-```bash
-npm run dice:login
-```
-
-A browser opens — sign in, land on your dashboard, press Enter. The session is saved to `download/dice-auth.json` and reused on every run. When it expires you'll get a Slack alert to re-run `npm run dice:login` (Dice capture keeps working meanwhile, just without applied-job exclusion).
-
-### Why the extension for JobRight?
-
-Autofill buttons only show when you are signed in. The extension opens JobRight in a background tab using **your existing Chrome cookies**, scrapes autofill jobs, and posts them to the local API. No `jobright:login` / Playwright auth file needed.
-
-**Requirements for JobRight auto-capture:**
-
-1. Stay signed in to [jobright.ai](https://jobright.ai) in Chrome  
-2. API auto-starts at Windows logon (`npm run schedule:api`) — no manual `npm start`  
-3. Load this repo’s `extension/` (unpacked)  
-4. Click **Capture JobRight** once to verify
-
-## Fully automatic — daily at 5 AM and 5 PM (Windows)
-
-Install **both** scheduled tasks (capture + API at logon):
-
-```bash
-npm run schedule:install
-```
-
-| Task | What it does |
-|------|----------------|
-| `AIJobCapture_5am5pm` | Runs capture daily at **5:00 AM** and **5:00 PM** (local time) |
-| `AIJobCapture_API_AtLogon` | Starts `node src/server.js` when you log in (so JobRight extension can ingest) |
-
-You do **not** need to open Cursor or type `npm start` after that — just reboot/login once, stay signed in to JobRight in Chrome, and keep the extension loaded.
-
-Optional checks:
-
-```powershell
-Get-ScheduledTask -TaskName AIJobCapture_5am5pm, AIJobCapture_API_AtLogon
-Start-ScheduledTask -TaskName AIJobCapture_API_AtLogon
-Start-ScheduledTask -TaskName AIJobCapture_5am5pm
-```
-
-Individual installs: `npm run schedule:dice` or `npm run schedule:api`.
+| Source | Type | Notes |
+|--------|------|-------|
+| **Remotive** | Public JSON | Attribution: Remotive.com |
+| **Jobicy** | Public JSON | `geo=usa` / `apac` / `anywhere` |
+| **Himalayas** | Public JSON | Country search US + Australia |
+| **Arbeitnow** | Public JSON | Aggregated ATS feed |
+| **RemoteOK** | Public JSON | Client-side query filter |
+| **Greenhouse** | Public board API | Curated company boards |
+| **Lever** | Public postings API | Curated company list |
+| **Ashby** | Public job-board API | Curated org list |
+| **Dice** | Playwright | US; optional login for applied exclusion |
+| **JobRight** | Extension / Playwright | US |
+| **Built In** | Playwright | US-centric |
+| **Seek** | Playwright | AU (`seek.com.au`) |
+| **ZipRecruiter / Monster** | Playwright | Often blocked in headless |
 
 ## Manual run
 
@@ -84,33 +49,29 @@ npm run capture
 npm start
 ```
 
-Then load `extension/` unpacked in Chrome.
-
 | Endpoint | Description |
 |----------|-------------|
-| `GET /api/status` | Last run, CSV paths |
-| `GET /api/jobs?status=new` | New jobs |
-| `POST /api/run` | Trigger Dice capture (Node) |
+| `GET /api/status` | Last run, CSV paths, source toggles |
+| `GET /api/jobs?region=US` | List stored jobs |
+| `POST /api/run` | Trigger capture |
 | `POST /api/ingest` | Extension posts JobRight jobs |
-| `GET /api/export.csv?source=dice` | Download Dice CSV |
-| `GET /api/export.csv?source=jobright` | Download JobRight CSV |
+| `GET /api/export.csv?region=us` | Download US CSV |
+| `GET /api/export.csv?region=au` | Download AU CSV |
 
 ## Env highlights
 
-| Key | Meaning |
-|-----|---------|
-| `SEARCH_Q` | Primary query label (`AI Engineer`) |
-| `SEARCH_QUERIES` | Comma-separated discovery queries for Dice / Built In / … |
-| `JOBRIGHT_TITLES` | Comma-separated JobRight seed titles |
-| `CAPTURE_DICE` | `true`/`false` |
-| `CAPTURE_JOBRIGHT` | Playwright JobRight (`false` = use extension) |
-| `JOBRIGHT_AUTH_PATH` | Playwright login state |
-| `CSV_PREFIX_DICE` / `CSV_PREFIX_JOBRIGHT` | Dated filename prefixes |
-| `DATA_DIR` | Output folder (`download`) |
-| `CRON_SCHEDULE` | Used by `npm start` only |
+See [`.env.example`](.env.example) for `SEARCH_QUERIES`, `CAPTURE_*`, `CSV_US_FILE` / `CSV_AU_FILE`, and board/company lists.
+
+## Scheduler (Windows)
+
+```bash
+npm run schedule:install
+```
+
+Runs capture at **5:00 AM** and **5:00 PM**, and starts the local API at logon for the JobRight extension.
 
 ## Notes
 
 - Personal job-hunting use; polite delays / page caps.
-- After JobRight UI changes, re-run `npm run jobright:login` if autofill jobs stop appearing.
-- Re-run `npm run schedule:install` after upgrading so Windows tasks use the new `AIJobCapture_*` names (old `DiceJobCapture_*` tasks are removed).
+- Remotive data is used for personal discovery; attribute Remotive.com when sharing derived listings.
+- Re-run `npm run jobright:login` / `npm run dice:login` when sessions expire.

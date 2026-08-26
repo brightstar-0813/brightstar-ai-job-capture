@@ -4,7 +4,7 @@
 
 import { config } from "../config.js";
 import {
-  containsAi,
+  matchesTargetRole,
   isRemoteArrangement,
   isWithinRecentDays,
   parsePostedDate,
@@ -106,7 +106,8 @@ async function scrapeDetail(page, stub) {
     organization: data.organization || "",
     location: data.location || "",
     work_arrangement: data.work_arrangement || "Remote",
-    remote_restricted_to: "",
+    remote_restricted_to: "United States",
+    region: "US",
     experience_level: "",
     employment_type: "",
     salary_min: "",
@@ -175,7 +176,7 @@ export async function searchBuiltinJobs(browser) {
           nonRemote += 1;
           continue;
         }
-        if (!containsAi(job.title, job.description)) {
+        if (!matchesTargetRole(job)) {
           nonAi += 1;
           continue;
         }

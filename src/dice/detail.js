@@ -188,6 +188,8 @@ export async function scrapeJobDetail(page, url) {
     source: "dice",
     date_posted: datePosted,
     description: data.description || "",
+    region: "US",
+    remote_restricted_to: "United States",
   };
 }
 

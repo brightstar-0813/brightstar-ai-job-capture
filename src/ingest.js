@@ -3,6 +3,7 @@
  */
 
 import { matchesCaptureRule } from "./filter.js";
+import { applyRegionFields, classifyRegion } from "./geo.js";
 import {
   beginRun,
   finishRun,
@@ -16,7 +17,7 @@ import { config } from "./config.js";
 
 /**
  * @param {object[]} jobs
- * @param {{ source?: string, skipSlack?: boolean }} [opts]
+ * @param {{ source?: string, skipSlack?: boolean, trusted?: boolean }} [opts]
  */
 export async function ingestJobsPayload(jobs, opts = {}) {
   const source = String(opts.source || "jobright").toLowerCase();
@@ -31,6 +32,11 @@ export async function ingestJobsPayload(jobs, opts = {}) {
       source: raw.source || source,
       id: raw.id || (raw.jobId ? `${source}_${raw.jobId}` : null),
     };
+    if (source === "jobright" && !job.region) {
+      job.region = "US";
+      if (!job.remote_restricted_to) job.remote_restricted_to = "United States";
+    }
+    applyRegionFields(job);
     if (!job.id) {
       counts.skippedCount += 1;
       continue;
@@ -39,6 +45,12 @@ export async function ingestJobsPayload(jobs, opts = {}) {
       counts.skippedCount += 1;
       continue;
     }
+    const region = classifyRegion(job);
+    if (region !== "US" && region !== "AU") {
+      counts.skippedCount += 1;
+      continue;
+    }
+    job.region = region;
     // Only accept autofill for jobright unless extension already filtered (trusted)
     if (source === "jobright" && !opts.trusted) {
       const apply = String(raw.applyLabel || raw.apply_type || "").toUpperCase();

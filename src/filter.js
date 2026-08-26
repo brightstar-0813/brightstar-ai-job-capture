@@ -1,31 +1,70 @@
 /**
- * Capture rule: remote AI Engineer / AI Developer family only.
+ * Capture rule: remote Software Engineer, AI-focused Backend Engineer,
+ * or AI/ML Engineer (title and/or strong JD keywords).
  *
- * Gold-standard titles look like the Fantastic Jobs sample: AI Engineer,
- * Senior AI Engineer, Full Stack AI Engineer, AI Developer, GenAI / Agentic
- * AI Engineer, LLM Engineer. Exact wording is not required.
- *
- * Generic software/ML titles are skipped even if the JD mentions AI.
- * Non-eng "AI" titles (sales, recruiting, PM) are skipped.
+ * Exclude Data Engineer / Salesforce and non-eng "AI" titles.
  */
 
-const AI_FAMILY_RE =
-  /\b(?:gen(?:erative)?[\s-]?ai|agentic[\s-]?ai|llms?|a\.i\.)\b|\bai\b/i;
+const SWE_TITLE_RE = /\bsoftware\s+engineers?\b/i;
 
-const ENG_OR_DEV_RE = /\b(engineers?|developers?)\b/i;
+const BACKEND_TITLE_RE =
+  /\b(?:back[\s-]?end|backend|server[\s-]?side)\s+engineers?\b/i;
 
-const NOT_AI_ENG_TITLE_RE =
-  /\b(account executive|sales|recruiter|recruiting|sourcer|customer success|marketing|product manager|program manager|project manager|designer|writer|intern(?!al)|teacher|instructor)\b/i;
+const AIML_TITLE_RE =
+  /\b(?:gen(?:erative)?[\s-]?ai|agentic[\s-]?ai|llms?|a\.?i\.?|ai[\s/:-]?ml|machine[\s-]?learning|ml)\b.*\b(?:engineers?|developers?)\b|\b(?:engineers?|developers?)\b.*\b(?:gen(?:erative)?[\s-]?ai|agentic[\s-]?ai|llms?|a\.?i\.?|ai[\s/:-]?ml|machine[\s-]?learning|\bml\b)\b|\b(?:ai|ml|llm|genai)[\s/-]*(?:engineers?|developers?)\b/i;
+
+const ENG_OR_DEV_TITLE_RE =
+  /\b(?:software|back[\s-]?end|backend|full[\s-]?stack|platform)?\s*(?:engineers?|developers?)\b/i;
+
+/** Strong AI/ML signals for JD (and title) — prefer stack/domain tokens over bare "ai". */
+const AI_SIGNAL_RE =
+  /\b(?:gen(?:erative)?[\s-]?ai|agentic[\s-]?ai|llms?|large[\s-]?language[\s-]?models?|machine[\s-]?learning|deep[\s-]?learning|mlops|pytorch|tensorflow|langchain|llamaindex|rag\b|retrieval[\s-]?augmented|neural[\s-]?nets?|transformers?\b|nlp\b|computer[\s-]?vision|reinforcement[\s-]?learning|foundation[\s-]?models?)\b|\bai[\s/:-]?ml\b/i;
+
+const AI_FAMILY_IN_TITLE_RE =
+  /\b(?:gen(?:erative)?[\s-]?ai|agentic[\s-]?ai|llms?|a\.i\.|ai[\s/:-]?ml|machine[\s-]?learning|\bml\b|\bai\b)\b/i;
+
+const EXCLUDE_TITLE_RE =
+  /\b(?:data\s+engineers?|\bde\b\s+engineers?|salesforce|sales\s+cloud|sfdc|account\s+executive|sales\b|recruiter|recruiting|sourcer|customer\s+success|marketing|product\s+manager|program\s+manager|project\s+manager|designer|writer|intern(?!al)|teacher|instructor)\b/i;
 
 /**
- * Title is an AI Engineer / AI Developer (or close variant). JD is ignored
- * so a backend SWE with "we use AI" in the description is not kept.
+ * @deprecated Prefer matchesTargetRole — kept for older call sites.
  */
-export function containsAi(title, _description) {
-  const t = String(title || "");
-  if (!t.trim()) return false;
-  if (NOT_AI_ENG_TITLE_RE.test(t)) return false;
-  return AI_FAMILY_RE.test(t) && ENG_OR_DEV_RE.test(t);
+export function containsAi(title, description) {
+  return matchesTargetRole({ title, description, work_arrangement: "Remote" });
+}
+
+/**
+ * Title / JD role families we keep.
+ * @param {{ title?: string, description?: string }} job
+ */
+export function matchesTargetRole(job) {
+  const title = String(job?.title || "");
+  const description = String(job?.description || "");
+  if (!title.trim()) return false;
+  if (EXCLUDE_TITLE_RE.test(title)) return false;
+
+  // 1) Explicit Software Engineer title
+  if (SWE_TITLE_RE.test(title)) return true;
+
+  // 2) AI/ML Engineer family in title
+  if (AIML_TITLE_RE.test(title)) return true;
+  if (AI_FAMILY_IN_TITLE_RE.test(title) && /\b(?:engineers?|developers?)\b/i.test(title)) {
+    return true;
+  }
+
+  // 3) Backend Engineer + AI signal in title or JD
+  if (BACKEND_TITLE_RE.test(title)) {
+    if (AI_SIGNAL_RE.test(title) || AI_FAMILY_IN_TITLE_RE.test(title)) return true;
+    if (AI_SIGNAL_RE.test(description)) return true;
+    return false;
+  }
+
+  // 4) Engineer/Developer title + strong JD AI/ML keywords
+  if (ENG_OR_DEV_TITLE_RE.test(title) && AI_SIGNAL_RE.test(description)) {
+    return true;
+  }
+
+  return false;
 }
 
 /**
@@ -44,13 +83,13 @@ export function isRemoteArrangement(workArrangement) {
 }
 
 /**
- * Final capture decision: AI Engineer/Developer-family title + remote.
+ * Final capture decision: target role family + remote.
  * @param {{ title?: string, description?: string, organization?: string, work_arrangement?: string }} job
  */
 export function matchesCaptureRule(job) {
   if (!job) return false;
   if (!isRemoteArrangement(job.work_arrangement)) return false;
-  return containsAi(job.title, job.description);
+  return matchesTargetRole(job);
 }
 
 export function filterAiJobs(jobs) {
@@ -131,4 +170,22 @@ export function isRecentJob(job, days, now = new Date()) {
   const bySeen = isWithinRecentDays(job.first_seen_at, days, now);
   if (bySeen !== null) return bySeen;
   return true;
+}
+
+/** Strip HTML to plain text for JD keyword matching. */
+export function stripHtml(html) {
+  return String(html || "")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n\n")
+    .replace(/<\/li>/gi, "\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&#39;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }

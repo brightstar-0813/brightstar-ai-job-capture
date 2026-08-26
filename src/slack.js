@@ -51,6 +51,14 @@ function sourceLabel(source) {
     greenhouse: "Greenhouse",
     ziprecruiter: "ZipRecruiter",
     monster: "Monster",
+    remotive: "Remotive",
+    jobicy: "Jobicy",
+    himalayas: "Himalayas",
+    arbeitnow: "Arbeitnow",
+    remoteok: "RemoteOK",
+    lever: "Lever",
+    ashby: "Ashby",
+    seek: "Seek",
     both: "Dice + JobRight",
   };
   return labels[s] || source;
@@ -65,6 +73,14 @@ function jobSourceTag(job) {
     greenhouse: "[Greenhouse] ",
     ziprecruiter: "[ZipRecruiter] ",
     monster: "[Monster] ",
+    remotive: "[Remotive] ",
+    jobicy: "[Jobicy] ",
+    himalayas: "[Himalayas] ",
+    arbeitnow: "[Arbeitnow] ",
+    remoteok: "[RemoteOK] ",
+    lever: "[Lever] ",
+    ashby: "[Ashby] ",
+    seek: "[Seek] ",
   };
   return labels[s] || "";
 }
@@ -88,6 +104,8 @@ export async function notifyCaptureComplete({
   updatedCount = 0,
   skippedCount = 0,
   newJobs = [],
+  usCount = null,
+  auCount = null,
 }) {
   if (!webhookUrl || !isSlackWebhookUrl(webhookUrl)) {
     return { skipped: true, reason: "no_webhook" };
@@ -116,12 +134,13 @@ export async function notifyCaptureComplete({
   const maxBullets = 15;
   const bullets = newJobs.slice(0, maxBullets).map((j) => {
     const tag = showPerJobTag ? jobSourceTag(j) : "";
+    const region = j.region ? ` (${j.region})` : "";
     const who = [j.organization, j.title].filter(Boolean).join(" — ") || "job";
     const link = j.url ? ` <${j.url}|open>` : "";
     const preview = truncate(j.description, 100);
     return preview
-      ? `• ${tag}${who}${link}\n  _${preview}_`
-      : `• ${tag}${who}${link}`;
+      ? `• ${tag}${who}${region}${link}\n  _${preview}_`
+      : `• ${tag}${who}${region}${link}`;
   });
 
   const more =
@@ -129,11 +148,16 @@ export async function notifyCaptureComplete({
       ? `\n_…and ${newJobs.length - maxBullets} more new jobs_`
       : "";
 
-  const header = `*${label} AI jobs capture* (run #${runId})\nnew: *${newCount}* · updated: ${updatedCount} · skipped filter: ${skippedCount}`;
+  const regionLine =
+    usCount != null || auCount != null
+      ? `\nCSV rows — US: *${usCount ?? "?"}* · AU: *${auCount ?? "?"}*`
+      : "";
+
+  const header = `*${label} SWE/AI-ML capture* (run #${runId})\nnew: *${newCount}* · updated: ${updatedCount} · skipped filter: ${skippedCount}${regionLine}`;
   const body =
     newCount > 0
       ? `${header}\n\n${bullets.join("\n")}${more}`
-      : `${header}\n_No new AI jobs this run._`;
+      : `${header}\n_No new matching jobs this run._`;
 
   await postSlackMessage(webhookUrl, body);
   return { ok: true };

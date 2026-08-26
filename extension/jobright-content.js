@@ -11,7 +11,7 @@
 (function () {
   // Bump when scrape/API body changes so executeScript can replace a stale
   // injection (old code used workModel: ["Remote"] → HTTP 400).
-  const CS_VERSION = 6;
+  const CS_VERSION = 7;
   if (window.__AI_JOBRIGHT_CS_VERSION__ === CS_VERSION) return;
   if (typeof window.__AI_JOBRIGHT_CS_LISTENER__ === "function") {
     try {
@@ -23,17 +23,39 @@
   window.__AI_JOBRIGHT_CS_VERSION__ = CS_VERSION;
   window.__AI_JOBRIGHT_CS_LOADED__ = true;
 
-const AI_FAMILY_RE =
-  /\b(?:gen(?:erative)?[\s-]?ai|agentic[\s-]?ai|llms?|a\.i\.)\b|\bai\b/i;
-const ENG_OR_DEV_RE = /\b(engineers?|developers?)\b/i;
-const NOT_AI_ENG_TITLE_RE =
-  /\b(account executive|sales|recruiter|recruiting|sourcer|customer success|marketing|product manager|program manager|project manager|designer|writer|intern(?!al)|teacher|instructor)\b/i;
+const SWE_TITLE_RE = /\bsoftware\s+engineers?\b/i;
+const BACKEND_TITLE_RE =
+  /\b(?:back[\s-]?end|backend|server[\s-]?side)\s+engineers?\b/i;
+const AIML_TITLE_RE =
+  /\b(?:gen(?:erative)?[\s-]?ai|agentic[\s-]?ai|llms?|a\.?i\.?|ai[\s/:-]?ml|machine[\s-]?learning|ml)\b.*\b(?:engineers?|developers?)\b|\b(?:engineers?|developers?)\b.*\b(?:gen(?:erative)?[\s-]?ai|agentic[\s-]?ai|llms?|a\.?i\.?|ai[\s/:-]?ml|machine[\s-]?learning|\bml\b)\b|\b(?:ai|ml|llm|genai)[\s/-]*(?:engineers?|developers?)\b/i;
+const ENG_OR_DEV_TITLE_RE =
+  /\b(?:software|back[\s-]?end|backend|full[\s-]?stack|platform)?\s*(?:engineers?|developers?)\b/i;
+const AI_SIGNAL_RE =
+  /\b(?:gen(?:erative)?[\s-]?ai|agentic[\s-]?ai|llms?|large[\s-]?language[\s-]?models?|machine[\s-]?learning|deep[\s-]?learning|mlops|pytorch|tensorflow|langchain|llamaindex|rag\b|retrieval[\s-]?augmented|neural[\s-]?nets?|transformers?\b|nlp\b|computer[\s-]?vision|reinforcement[\s-]?learning|foundation[\s-]?models?)\b|\bai[\s/:-]?ml\b/i;
+const AI_FAMILY_IN_TITLE_RE =
+  /\b(?:gen(?:erative)?[\s-]?ai|agentic[\s-]?ai|llms?|a\.i\.|ai[\s/:-]?ml|machine[\s-]?learning|\bml\b|\bai\b)\b/i;
+const EXCLUDE_TITLE_RE =
+  /\b(?:data\s+engineers?|\bde\b\s+engineers?|salesforce|sales\s+cloud|sfdc|account\s+executive|sales\b|recruiter|recruiting|sourcer|customer\s+success|marketing|product\s+manager|program\s+manager|project\s+manager|designer|writer|intern(?!al)|teacher|instructor)\b/i;
 
-function containsAi(title) {
-  const t = String(title || "");
-  if (!t.trim()) return false;
-  if (NOT_AI_ENG_TITLE_RE.test(t)) return false;
-  return AI_FAMILY_RE.test(t) && ENG_OR_DEV_RE.test(t);
+function matchesTargetRole(job) {
+  const title = String(job?.title || "");
+  const description = String(job?.description || "");
+  if (!title.trim()) return false;
+  if (EXCLUDE_TITLE_RE.test(title)) return false;
+  if (SWE_TITLE_RE.test(title)) return true;
+  if (AIML_TITLE_RE.test(title)) return true;
+  if (AI_FAMILY_IN_TITLE_RE.test(title) && /\b(?:engineers?|developers?)\b/i.test(title)) {
+    return true;
+  }
+  if (BACKEND_TITLE_RE.test(title)) {
+    if (AI_SIGNAL_RE.test(title) || AI_FAMILY_IN_TITLE_RE.test(title)) return true;
+    if (AI_SIGNAL_RE.test(description)) return true;
+    return false;
+  }
+  if (ENG_OR_DEV_TITLE_RE.test(title) && AI_SIGNAL_RE.test(description)) {
+    return true;
+  }
+  return false;
 }
 
 function isRemoteArrangement(workArrangement) {
@@ -148,11 +170,11 @@ function isLinkedinApply(mapped) {
 }
 
 function isAiJob(mapped) {
-  return containsAi(mapped.title, mapped.description);
+  return matchesTargetRole(mapped);
 }
 
 async function fetchRecommendJobs(query, count = 50) {
-  const value = query || "AI Engineer";
+  const value = query || "Software Engineer";
   const body = {
     searchType: "job_title",
     value,
@@ -240,7 +262,7 @@ async function fetchAppliedJobIds() {
 }
 
 async function ensureSearch(query) {
-  const q = query || "AI Engineer";
+  const q = query || "Software Engineer";
   if (/value=/i.test(location.href)) return;
   const input = document.querySelector(
     'input[placeholder*="Search" i], input[type="search"]'
@@ -261,7 +283,7 @@ async function scrapeJobrightJobs(titles) {
   const listTitles =
     Array.isArray(titles) && titles.length
       ? titles
-      : ["AI Engineer"];
+      : ["Software Engineer", "Backend Engineer", "AI Engineer", "ML Engineer"];
 
   const byId = new Map();
   let apiCount = 0;
