@@ -189,6 +189,7 @@ export const config = {
   captureHimalayas: bool("CAPTURE_HIMALAYAS", true),
   captureArbeitnow: bool("CAPTURE_ARBEITNOW", true),
   captureRemoteok: bool("CAPTURE_REMOTEOK", true),
+  captureWeworkremotely: bool("CAPTURE_WEWORKREMOTELY", true),
 
   // Public ATS boards
   captureLever: bool("CAPTURE_LEVER", true),
@@ -235,6 +236,7 @@ export const SOURCE_IDS = [
   "himalayas",
   "arbeitnow",
   "remoteok",
+  "weworkremotely",
   "greenhouse",
   "lever",
   "ashby",
@@ -253,6 +255,7 @@ export const CSV_SOURCE_ORDER = [
   "himalayas",
   "arbeitnow",
   "remoteok",
+  "weworkremotely",
   "greenhouse",
   "lever",
   "ashby",

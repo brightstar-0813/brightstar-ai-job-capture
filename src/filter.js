@@ -2,8 +2,11 @@
  * Capture rule: remote Software Engineer, AI-focused Backend Engineer,
  * or AI/ML Engineer (title and/or strong JD keywords).
  *
- * Exclude Data Engineer / Salesforce and non-eng "AI" titles.
+ * Exclude Data Engineer / Salesforce / Frontend and non-eng "AI" titles.
  */
+
+const FRONTEND_TITLE_RE =
+  /\b(?:front[\s-]?end|frontend|ui|ux|client[\s-]?side|react|angular|vue|svelte)\s+(?:engineers?|developers?)\b|\b(?:engineers?|developers?)\s*[,/-]\s*front[\s-]?end\b|\bfront[\s-]?end\s+(?:engineers?|developers?)\b/i;
 
 const SWE_TITLE_RE = /\bsoftware\s+engineers?\b/i;
 
@@ -42,6 +45,7 @@ export function matchesTargetRole(job) {
   const description = String(job?.description || "");
   if (!title.trim()) return false;
   if (EXCLUDE_TITLE_RE.test(title)) return false;
+  if (FRONTEND_TITLE_RE.test(title)) return false;
 
   // 1) Explicit Software Engineer title
   if (SWE_TITLE_RE.test(title)) return true;

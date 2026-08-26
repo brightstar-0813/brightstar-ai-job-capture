@@ -17,6 +17,7 @@ import { searchJobicyJobs } from "./jobicy/search.js";
 import { searchHimalayasJobs } from "./himalayas/search.js";
 import { searchArbeitnowJobs } from "./arbeitnow/search.js";
 import { searchRemoteokJobs } from "./remoteok/search.js";
+import { searchWeworkremotelyJobs } from "./weworkremotely/search.js";
 import { searchLeverJobs } from "./lever/search.js";
 import { searchAshbyJobs } from "./ashby/search.js";
 import { searchSeekJobs } from "./seek/search.js";
@@ -78,6 +79,7 @@ function enabledSources() {
   if (config.captureHimalayas) out.push("himalayas");
   if (config.captureArbeitnow) out.push("arbeitnow");
   if (config.captureRemoteok) out.push("remoteok");
+  if (config.captureWeworkremotely) out.push("weworkremotely");
   if (config.captureGreenhouse) out.push("greenhouse");
   if (config.captureLever) out.push("lever");
   if (config.captureAshby) out.push("ashby");
@@ -151,6 +153,15 @@ export async function runCapture({ skipSlack = false } = {}) {
     }
     if (config.captureRemoteok) {
       await runApiSource("remoteok", searchRemoteokJobs, runId, counts, newJobs);
+    }
+    if (config.captureWeworkremotely) {
+      await runApiSource(
+        "weworkremotely",
+        searchWeworkremotelyJobs,
+        runId,
+        counts,
+        newJobs
+      );
     }
     if (config.captureGreenhouse) {
       await runApiSource(

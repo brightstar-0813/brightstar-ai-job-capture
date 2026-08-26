@@ -11,7 +11,7 @@
 (function () {
   // Bump when scrape/API body changes so executeScript can replace a stale
   // injection (old code used workModel: ["Remote"] → HTTP 400).
-  const CS_VERSION = 7;
+  const CS_VERSION = 8;
   if (window.__AI_JOBRIGHT_CS_VERSION__ === CS_VERSION) return;
   if (typeof window.__AI_JOBRIGHT_CS_LISTENER__ === "function") {
     try {
@@ -36,12 +36,15 @@ const AI_FAMILY_IN_TITLE_RE =
   /\b(?:gen(?:erative)?[\s-]?ai|agentic[\s-]?ai|llms?|a\.i\.|ai[\s/:-]?ml|machine[\s-]?learning|\bml\b|\bai\b)\b/i;
 const EXCLUDE_TITLE_RE =
   /\b(?:data\s+engineers?|\bde\b\s+engineers?|salesforce|sales\s+cloud|sfdc|account\s+executive|sales\b|recruiter|recruiting|sourcer|customer\s+success|marketing|product\s+manager|program\s+manager|project\s+manager|designer|writer|intern(?!al)|teacher|instructor)\b/i;
+const FRONTEND_TITLE_RE =
+  /\b(?:front[\s-]?end|frontend|ui|ux|client[\s-]?side|react|angular|vue|svelte)\s+(?:engineers?|developers?)\b|\b(?:engineers?|developers?)\s*[,/-]\s*front[\s-]?end\b|\bfront[\s-]?end\s+(?:engineers?|developers?)\b/i;
 
 function matchesTargetRole(job) {
   const title = String(job?.title || "");
   const description = String(job?.description || "");
   if (!title.trim()) return false;
   if (EXCLUDE_TITLE_RE.test(title)) return false;
+  if (FRONTEND_TITLE_RE.test(title)) return false;
   if (SWE_TITLE_RE.test(title)) return true;
   if (AIML_TITLE_RE.test(title)) return true;
   if (AI_FAMILY_IN_TITLE_RE.test(title) && /\b(?:engineers?|developers?)\b/i.test(title)) {
