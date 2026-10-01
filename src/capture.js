@@ -1,6 +1,6 @@
 /**
- * Capture AI jobs from Dice, JobRight, Built In, Greenhouse,
- * ZipRecruiter, and Monster. Task Scheduler / cron entrypoint.
+ * Capture AI jobs from Dice, JobRight, Built In, Greenhouse, Lever, Ashby,
+ * public remote feeds, and optional keyed APIs. Task Scheduler / cron entrypoint.
  */
 
 import { chromium } from "playwright";
@@ -10,8 +10,25 @@ import { scrapeJobDetails } from "./dice/detail.js";
 import { searchJobrightJobs } from "./jobright/search.js";
 import { searchBuiltinJobs } from "./builtin/search.js";
 import { searchGreenhouseJobs } from "./greenhouse/search.js";
+import { searchLeverJobs } from "./lever/search.js";
+import { searchAshbyJobs } from "./ashby/search.js";
 import { searchZiprecruiterJobs } from "./ziprecruiter/search.js";
 import { searchMonsterJobs } from "./monster/search.js";
+import { searchRemotiveJobs } from "./remotive/search.js";
+import { searchJobicyJobs } from "./jobicy/search.js";
+import { searchRemoteokJobs } from "./remoteok/search.js";
+import { searchWwrJobs } from "./wwr/search.js";
+import { searchHimalayasJobs } from "./himalayas/search.js";
+import { searchJobgetherJobs } from "./jobgether/search.js";
+import { searchArbeitnowJobs } from "./arbeitnow/search.js";
+import { searchThemuseJobs } from "./themuse/search.js";
+import { searchWorkingnomadsJobs } from "./workingnomads/search.js";
+import { searchJobspressoJobs } from "./jobspresso/search.js";
+import { searchSkipthedriveJobs } from "./skipthedrive/search.js";
+import { searchArcJobs } from "./arc/search.js";
+import { searchUsajobsJobs } from "./usajobs/search.js";
+import { searchAdzunaJobs } from "./adzuna/search.js";
+import { searchGoogleJobs } from "./googlejobs/search.js";
 import { matchesCaptureRule } from "./filter.js";
 import {
   beginRun,
@@ -56,13 +73,74 @@ function ingestJobs(jobs, runId, counts, newJobs) {
 
 function enabledSources() {
   const out = [];
-  if (config.captureDice) out.push("dice");
-  if (config.captureJobright) out.push("jobright");
   if (config.captureBuiltin) out.push("builtin");
+  if (config.captureHimalayas) out.push("himalayas");
   if (config.captureGreenhouse) out.push("greenhouse");
+  if (config.captureDice) out.push("dice");
+  if (config.captureLever) out.push("lever");
+  if (config.captureAshby) out.push("ashby");
+  if (config.captureRemotive) out.push("remotive");
+  if (config.captureJobicy) out.push("jobicy");
+  if (config.captureRemoteok) out.push("remoteok");
+  if (config.captureWwr) out.push("wwr");
+  if (config.captureJobgether) out.push("jobgether");
+  if (config.captureArbeitnow) out.push("arbeitnow");
+  if (config.captureThemuse) out.push("themuse");
+  if (config.captureWorkingnomads) out.push("workingnomads");
+  if (config.captureJobspresso) out.push("jobspresso");
+  if (config.captureSkipthedrive) out.push("skipthedrive");
+  if (config.captureArc) out.push("arc");
+  if (config.captureUsajobs) out.push("usajobs");
+  if (config.captureAdzuna) out.push("adzuna");
+  if (config.captureGooglejobs) out.push("googlejobs");
   if (config.captureZiprecruiter) out.push("ziprecruiter");
   if (config.captureMonster) out.push("monster");
+  if (config.captureJobright) out.push("jobright");
   return out;
+}
+
+async function runNamedSource(name, fn) {
+  try {
+    return await fn();
+  } catch (err) {
+    console.warn(`[capture] ${name} failed: ${err.message}`);
+    return null;
+  }
+}
+
+async function collectFeedJobs() {
+  const runners = [];
+  if (config.captureHimalayas) runners.push(["himalayas", searchHimalayasJobs]);
+  if (config.captureGreenhouse) runners.push(["greenhouse", searchGreenhouseJobs]);
+  if (config.captureLever) runners.push(["lever", searchLeverJobs]);
+  if (config.captureAshby) runners.push(["ashby", searchAshbyJobs]);
+  if (config.captureRemotive) runners.push(["remotive", searchRemotiveJobs]);
+  if (config.captureJobicy) runners.push(["jobicy", searchJobicyJobs]);
+  if (config.captureRemoteok) runners.push(["remoteok", searchRemoteokJobs]);
+  if (config.captureWwr) runners.push(["wwr", searchWwrJobs]);
+  if (config.captureJobgether) runners.push(["jobgether", searchJobgetherJobs]);
+  if (config.captureArbeitnow) runners.push(["arbeitnow", searchArbeitnowJobs]);
+  if (config.captureThemuse) runners.push(["themuse", searchThemuseJobs]);
+  if (config.captureWorkingnomads)
+    runners.push(["workingnomads", searchWorkingnomadsJobs]);
+  if (config.captureJobspresso) runners.push(["jobspresso", searchJobspressoJobs]);
+  if (config.captureSkipthedrive)
+    runners.push(["skipthedrive", searchSkipthedriveJobs]);
+  if (config.captureArc) runners.push(["arc", searchArcJobs]);
+  if (config.captureUsajobs) runners.push(["usajobs", searchUsajobsJobs]);
+  if (config.captureAdzuna) runners.push(["adzuna", searchAdzunaJobs]);
+  if (config.captureGooglejobs) runners.push(["googlejobs", searchGoogleJobs]);
+  if (!runners.length) return [];
+
+  const batches = await Promise.all(
+    runners.map(async ([name, fn]) => {
+      const result = await runNamedSource(name, fn);
+      const jobs = result?.jobs || [];
+      console.log(`[capture] ${name} jobs: ${jobs.length}`);
+      return jobs;
+    })
+  );
+  return batches.flat();
 }
 
 export async function runCapture({ skipSlack = false } = {}) {
@@ -89,10 +167,19 @@ export async function runCapture({ skipSlack = false } = {}) {
   process.on("unhandledRejection", swallowTransient);
 
   try {
+    const feedPromise = collectFeedJobs();
     browser = await chromium.launch({ headless: config.headless });
 
+    if (config.captureBuiltin) {
+      await runNamedSource("builtin", async () => {
+        const { jobs } = await searchBuiltinJobs(browser);
+        console.log(`[capture] builtin jobs: ${jobs.length}`);
+        ingestJobs(jobs, runId, counts, newJobs);
+      });
+    }
+
     if (config.captureDice) {
-      try {
+      const runDice = async () => {
         const { jobs: stubs, appliedIds: diceApplied, unauthenticated } =
           await searchDiceJobs(browser);
         diceAuthExpired = !!unauthenticated;
@@ -109,60 +196,60 @@ export async function runCapture({ skipSlack = false } = {}) {
             );
           }
         }
-      } catch (err) {
-        console.warn(`[capture] dice failed, continuing: ${err.message}`);
+      };
+      const diceResult = await runNamedSource("dice", runDice);
+      if (diceResult === null) {
+        console.warn("[capture] dice retrying after browser relaunch");
         try {
           await browser.close();
         } catch {
           /* ignore */
         }
         browser = await chromium.launch({ headless: config.headless });
+        await runNamedSource("dice", runDice);
       }
-    }
-
-    if (config.captureBuiltin) {
-      const { jobs } = await searchBuiltinJobs(browser);
-      console.log(`[capture] builtin jobs: ${jobs.length}`);
-      ingestJobs(jobs, runId, counts, newJobs);
-    }
-
-    if (config.captureGreenhouse) {
-      const { jobs } = await searchGreenhouseJobs(browser);
-      console.log(`[capture] greenhouse jobs: ${jobs.length}`);
-      ingestJobs(jobs, runId, counts, newJobs);
     }
 
     if (config.captureZiprecruiter) {
-      const { jobs, blocked } = await searchZiprecruiterJobs(browser);
-      console.log(
-        `[capture] ziprecruiter jobs: ${jobs.length}${blocked ? " (blocked)" : ""}`
-      );
-      ingestJobs(jobs, runId, counts, newJobs);
+      await runNamedSource("ziprecruiter", async () => {
+        const { jobs, blocked } = await searchZiprecruiterJobs(browser);
+        console.log(
+          `[capture] ziprecruiter jobs: ${jobs.length}${blocked ? " (blocked)" : ""}`
+        );
+        ingestJobs(jobs, runId, counts, newJobs);
+      });
     }
 
     if (config.captureMonster) {
-      const { jobs, blocked } = await searchMonsterJobs(browser);
-      console.log(
-        `[capture] monster jobs: ${jobs.length}${blocked ? " (blocked)" : ""}`
-      );
-      ingestJobs(jobs, runId, counts, newJobs);
+      await runNamedSource("monster", async () => {
+        const { jobs, blocked } = await searchMonsterJobs(browser);
+        console.log(
+          `[capture] monster jobs: ${jobs.length}${blocked ? " (blocked)" : ""}`
+        );
+        ingestJobs(jobs, runId, counts, newJobs);
+      });
     }
+
+    const feedJobs = await feedPromise;
+    if (feedJobs.length) ingestJobs(feedJobs, runId, counts, newJobs);
 
     // JobRight last — CSV export also places JobRight rows at the bottom.
     if (config.captureJobright) {
-      const { jobs: jrJobs, auth, appliedIds } = await searchJobrightJobs(browser);
-      console.log(`[capture] jobright jobs: ${jrJobs.length}`);
-      jobrightAuthExpired = !!auth?.unauthenticated;
-      ingestJobs(jrJobs, runId, counts, newJobs);
+      await runNamedSource("jobright", async () => {
+        const { jobs: jrJobs, auth, appliedIds } = await searchJobrightJobs(browser);
+        console.log(`[capture] jobright jobs: ${jrJobs.length}`);
+        jobrightAuthExpired = !!auth?.unauthenticated;
+        ingestJobs(jrJobs, runId, counts, newJobs);
 
-      if (Array.isArray(appliedIds) && appliedIds.length) {
-        const { removed } = removeJobs(appliedIds);
-        if (removed > 0) {
-          console.log(
-            `[capture] removed ${removed} already-applied jobright jobs from store`
-          );
+        if (Array.isArray(appliedIds) && appliedIds.length) {
+          const { removed } = removeJobs(appliedIds);
+          if (removed > 0) {
+            console.log(
+              `[capture] removed ${removed} already-applied jobright jobs from store`
+            );
+          }
         }
-      }
+      });
     }
 
     const pruned = pruneStore();

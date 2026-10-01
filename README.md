@@ -1,6 +1,6 @@
 # AI Jobs Capture (multi-source)
 
-Capture **remote AI** jobs from Dice, JobRight, Built In, Greenhouse, ZipRecruiter, and Monster **twice daily (5:00 AM and 5:00 PM local time)**, append/dedupe locally, write **dated CSVs**, and Slack-notify on new jobs.
+Capture **remote AI** jobs from Dice, JobRight, Built In, Greenhouse, Lever, Ashby, and public remote feeds (Himalayas, Remotive, Jobicy, Remote OK, We Work Remotely, Jobgether, The Muse, Working Nomads, Jobspresso, SkipTheDrive, Arc, Arbeitnow), plus optional USAJOBS / Adzuna / Google Jobs when API keys are set. Runs **twice daily (5:00 AM and 5:00 PM local time)**, appends/dedupes locally, writes a combined CSV, and Slack-notifies on new jobs.
 
 ## What gets saved
 
@@ -22,7 +22,10 @@ Filter (applied to all sources):
 | **Dice** | Windows Task Scheduler | Optional login for applied-job exclusion |
 | **JobRight** | Scheduler + saved Playwright login (or Chrome extension) | Needs `npm run jobright:login` |
 | **Built In** | Scheduler (Playwright) | Reliable; remote + keyword search |
-| **Greenhouse** | Scheduler (public board API) | No login; polls curated company boards (`GREENHOUSE_BOARDS`) |
+| **Greenhouse / Lever / Ashby** | Scheduler (public board APIs) | No login; polls curated company boards |
+| **Himalayas, Remotive, Jobicy, Remote OK, WWR, Jobgether, Arbeitnow, The Muse, Working Nomads** | Scheduler (public JSON/RSS) | No browser |
+| **Jobspresso, SkipTheDrive, Arc.dev** | Scheduler (public listing pages) | No API |
+| **USAJOBS / Adzuna / Google Jobs** | Scheduler | Skipped until `USAJOBS_*`, `ADZUNA_*`, or `SERPAPI_KEY` is set |
 | **ZipRecruiter** | Scheduler (Playwright) | Often Cloudflare-blocked in headless — may return 0 |
 | **Monster** | Scheduler (Playwright) | Often empty/blocked in headless — may return 0 |
 
@@ -100,7 +103,12 @@ Then load `extension/` unpacked in Chrome.
 | Key | Meaning |
 |-----|---------|
 | `SEARCH_Q` | Primary query label (`AI Engineer`) |
-| `SEARCH_QUERIES` | Comma-separated discovery queries for Dice / Built In / … |
+| `SEARCH_QUERIES` | Comma-separated discovery queries for Dice / Built In / Himalayas / Remotive / … |
+| `JOBICY_TAGS` | Jobicy API tags (default `ai,llm,machine-learning,python`) |
+| `GREENHOUSE_BOARDS` / `LEVER_BOARDS` / `ASHBY_BOARDS` | Company board tokens |
+| `USAJOBS_API_KEY` / `USAJOBS_USER_EMAIL` | Optional federal search |
+| `ADZUNA_APP_ID` / `ADZUNA_APP_KEY` | Optional Adzuna search |
+| `SERPAPI_KEY` | Optional Google Jobs via SerpAPI |
 | `JOBRIGHT_TITLES` | Comma-separated JobRight seed titles |
 | `CAPTURE_DICE` | `true`/`false` |
 | `CAPTURE_JOBRIGHT` | Playwright JobRight (`false` = use extension) |

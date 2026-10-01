@@ -61,6 +61,55 @@ export function isLinkedinLink(...links) {
   return links.some((l) => /linkedin\.com/i.test(String(l || "")));
 }
 
+const US_RE = /\b(united states|usa|u\.s\.a\.?|u\.s\.)\b/;
+const CANADA_RE =
+  /\b(canada|canadian|ontario|quebec|british columbia|alberta|manitoba|saskatchewan|nova scotia|toronto|vancouver|montreal|ottawa|calgary|edmonton)\b/;
+const OTHER_REGION_RE =
+  /\b(uk|united kingdom|germany|france|india|emea|apac|australia|netherlands|spain|brazil|mexico|latam|latin america|poland|ireland)\b/;
+
+/**
+ * US remote only. Drop Canada-only and other-region-only postings.
+ * "US or Canada" still counts as US-eligible. Empty location is kept
+ * (Dice/JobRight searches are already US-scoped).
+ */
+export function isUsFriendlyLocation(location, title = "") {
+  const s = `${location || ""} ${title || ""}`.toLowerCase().trim();
+  if (!s) return true;
+  const hasUs = US_RE.test(s);
+  if (CANADA_RE.test(s) && !hasUs) return false;
+  if (hasUs) return true;
+  if (
+    /\b(worldwide|anywhere|global|north america|americas)\b/.test(s) &&
+    !/\b(emea|europe|india|uk[- ]only|latam)\b/.test(s)
+  ) {
+    return true;
+  }
+  if (/^remote\b/.test(s) && !/\b(emea|europe|india|uk|latam|apac)\b/.test(s)) {
+    return true;
+  }
+  if (OTHER_REGION_RE.test(s)) return false;
+  return true;
+}
+
+export function stripHtml(html) {
+  return String(html || "")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n\n")
+    .replace(/<\/li>/gi, "\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&#39;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCharCode(parseInt(h, 16)))
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 /**
  * Parse a job's posted date into an absolute Date. Handles:
  * - epoch ms (13 digits) / epoch seconds (10 digits)

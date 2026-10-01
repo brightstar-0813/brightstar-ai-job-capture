@@ -7,12 +7,9 @@
  */
 
 import { config } from "../config.js";
-import {
-  containsAi,
-  isRemoteArrangement,
-  isWithinRecentDays,
-  parsePostedDate,
-} from "../filter.js";
+import { parsePostedDate } from "../filter.js";
+import { emptySkipCounts, keepFeedJob, logKept } from "../feeds/keep.js";
+import { mapPool } from "../ats/map.js";
 
 function stripHtml(html) {
   return String(html || "")
@@ -64,37 +61,36 @@ export async function searchGreenhouseJobs(_browser) {
   const boards = config.greenhouseBoards || [];
   const all = [];
   const seen = new Set();
-  let nonRemoteSkipped = 0;
-  let nonAiSkipped = 0;
-  let staleSkipped = 0;
+  const counts = emptySkipCounts();
+  let scanned = 0;
   let boardErrors = 0;
 
   console.log(`[greenhouse] scanning ${boards.length} boards`);
 
-  for (const board of boards) {
+  await mapPool(boards, 8, async (board) => {
     let result;
     try {
       result = await fetchBoardJobs(board);
     } catch (err) {
       boardErrors += 1;
       console.warn(`[greenhouse] board ${board} failed: ${err.message}`);
-      continue;
+      return;
     }
     if (!result.ok) {
       boardErrors += 1;
-      if (result.status !== 404) {
+      if (result.status !== 404 && result.status !== 0) {
         console.warn(`[greenhouse] board ${board} HTTP ${result.status}`);
       }
-      continue;
+      return;
     }
 
     for (const j of result.jobs) {
       const id = `greenhouse_${board}_${j.id}`;
       if (seen.has(id)) continue;
       seen.add(id);
+      scanned += 1;
 
       const title = j.title || "";
-      const organization = board; // board token ≈ employer slug; refine below
       const description = stripHtml(j.content);
       const location = j.location?.name || "";
       const work = inferWorkArrangement(location, title, description);
@@ -103,7 +99,6 @@ export async function searchGreenhouseJobs(_browser) {
         ? postedAbs.toISOString().slice(0, 10)
         : String(j.updated_at || "");
 
-      // Prefer company name from absolute_url host path; organization from board.
       const companyName = String(board)
         .replace(/-/g, " ")
         .replace(/\b\w/g, (c) => c.toUpperCase());
@@ -128,27 +123,13 @@ export async function searchGreenhouseJobs(_browser) {
         description,
       };
 
-      if (!isRemoteArrangement(mapped.work_arrangement)) {
-        nonRemoteSkipped += 1;
-        continue;
-      }
-      if (!containsAi(mapped.title, mapped.description)) {
-        nonAiSkipped += 1;
-        continue;
-      }
-      if (isWithinRecentDays(mapped.date_posted, config.recentDays) === false) {
-        staleSkipped += 1;
-        continue;
-      }
-      all.push(mapped);
+      if (keepFeedJob(mapped, counts)) all.push(mapped);
     }
-  }
+  });
 
+  logKept("greenhouse", all.length, scanned, counts);
   console.log(
-    `[greenhouse] kept ${all.length} remote AI jobs` +
-      ` (boards=${boards.length}, boardErrors=${boardErrors},` +
-      ` non-remote=${nonRemoteSkipped},` +
-      ` non-AI=${nonAiSkipped}, stale=${staleSkipped})`
+    `[greenhouse] boards=${boards.length} errors=${boardErrors}`
   );
 
   return { jobs: all };
