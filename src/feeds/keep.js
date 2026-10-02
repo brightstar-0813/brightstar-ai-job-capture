@@ -2,7 +2,7 @@ import { config } from "../config.js";
 import {
   containsAi,
   isRemoteArrangement,
-  isUsFriendlyLocation,
+  isUsJobLocation,
   isWithinRecentDays,
   parsePostedDate,
   isLinkedinLink,
@@ -25,7 +25,7 @@ export function keepFeedJob(job, counts, { skipRecency = false } = {}) {
     counts.nonRemote += 1;
     return false;
   }
-  if (!isUsFriendlyLocation(job.location, job.title)) {
+  if (!isUsJobLocation(job)) {
     counts.location += 1;
     return false;
   }

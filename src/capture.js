@@ -57,7 +57,7 @@ function ingestJobs(jobs, runId, counts, newJobs) {
     if (!matchesCaptureRule(job)) {
       counts.skippedCount += 1;
       console.log(
-        `[filter] skip ${job.id}: not remote AI Engineer/Developer title`
+        `[filter] skip ${job.id}: not US remote AI Engineer/Developer title`
       );
       continue;
     }

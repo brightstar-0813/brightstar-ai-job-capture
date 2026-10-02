@@ -6,7 +6,7 @@ import { matchesCaptureRule, isRecentJob } from "./filter.js";
 
 /**
  * A job qualifies for the store/CSV output when it matches the capture rule
- * (remote AI Engineer/Developer-family title) AND was posted within the configured recency window.
+ * (US remote AI Engineer/Developer-family title) AND was posted within the configured recency window.
  */
 function matchesOutputRule(job) {
   return matchesCaptureRule(job) && isRecentJob(job, config.recentDays);

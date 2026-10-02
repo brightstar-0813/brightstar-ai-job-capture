@@ -44,12 +44,13 @@ export function isRemoteArrangement(workArrangement) {
 }
 
 /**
- * Final capture decision: AI Engineer/Developer-family title + remote.
- * @param {{ title?: string, description?: string, organization?: string, work_arrangement?: string }} job
+ * Final capture decision: US location + remote + AI Engineer/Developer title.
+ * @param {{ title?: string, description?: string, organization?: string, work_arrangement?: string, location?: string, source?: string }} job
  */
 export function matchesCaptureRule(job) {
   if (!job) return false;
   if (!isRemoteArrangement(job.work_arrangement)) return false;
+  if (!isUsJobLocation(job)) return false;
   return containsAi(job.title, job.description);
 }
 
@@ -61,34 +62,70 @@ export function isLinkedinLink(...links) {
   return links.some((l) => /linkedin\.com/i.test(String(l || "")));
 }
 
-const US_RE = /\b(united states|usa|u\.s\.a\.?|u\.s\.)\b/;
-const CANADA_RE =
-  /\b(canada|canadian|ontario|quebec|british columbia|alberta|manitoba|saskatchewan|nova scotia|toronto|vancouver|montreal|ottawa|calgary|edmonton)\b/;
-const OTHER_REGION_RE =
-  /\b(uk|united kingdom|germany|france|india|emea|apac|australia|netherlands|spain|brazil|mexico|latam|latin america|poland|ireland)\b/;
+/** Searches already restricted to the United States. A blank or plain "Remote" location is still US. */
+const US_SCOPED_SOURCES = new Set([
+  "dice",
+  "jobright",
+  "builtin",
+  "usajobs",
+  "adzuna",
+  "googlejobs",
+]);
+
+const US_STATE_RE =
+  /\b(alabama|alaska|arizona|arkansas|california|colorado|connecticut|delaware|florida|georgia|hawaii|idaho|illinois|indiana|iowa|kansas|kentucky|louisiana|maine|maryland|massachusetts|michigan|minnesota|mississippi|missouri|montana|nebraska|nevada|new hampshire|new jersey|new mexico|new york|north carolina|north dakota|ohio|oklahoma|oregon|pennsylvania|rhode island|south carolina|south dakota|tennessee|texas|utah|vermont|virginia|washington|west virginia|wisconsin|wyoming|district of columbia|d\.c\.)\b/;
+
+const US_POSTAL_RE =
+  /,\s*(al|ak|az|ar|ca|co|ct|dc|de|fl|ga|hi|ia|id|il|in|ks|ky|la|ma|md|me|mi|mn|mo|ms|mt|nc|nd|ne|nh|nj|nm|nv|ny|oh|ok|or|pa|ri|sc|sd|tn|tx|ut|va|vt|wa|wi|wv|wy)\b/;
+
+const NON_US_RE =
+  /\b(canada|canadian|ontario|quebec|british columbia|alberta|manitoba|saskatchewan|nova scotia|toronto|vancouver|montreal|ottawa|calgary|edmonton|uk|united kingdom|england|scotland|wales|germany|france|india|emea|apac|australia|netherlands|spain|brazil|mexico|latam|latin america|poland|ireland|europe|european|singapore|japan|china|philippines|portugal|italy|sweden|norway|denmark|israel|uae|dubai|africa|new zealand|south africa|romania|ukraine|belgium|austria|switzerland|colombia|argentina|chile|worldwide|anywhere|global|north america|americas)\b/;
+
+function locationText(location, title) {
+  return `${location || ""} ${title || ""}`.toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+function hasUsSignal(location, title) {
+  const loc = String(location || "").toLowerCase();
+  const titled = String(title || "").toLowerCase();
+  const both = `${loc} ${titled}`;
+  if (/\b(united states|u\.s\.a\.?|u\.s\.|usa)\b/.test(both)) return true;
+  if (US_STATE_RE.test(both) || US_POSTAL_RE.test(both)) return true;
+  if (/\bus\b/.test(loc)) return true;
+  return /\b((remote|based|located)\s*[-–,/]?\s*us|us\s*[-–,/]?\s*remote|in the us|\(\s*us\s*\))\b/.test(
+    titled
+  );
+}
+
+function isGenericRemoteLocation(location) {
+  const s = String(location || "").toLowerCase().trim();
+  if (!s) return true;
+  return /^(remote|fully remote|100%\s*remote|work from home|wfh)(\s*only)?$/.test(s);
+}
 
 /**
- * US remote only. Drop Canada-only and other-region-only postings.
- * "US or Canada" still counts as US-eligible. Empty location is kept
- * (Dice/JobRight searches are already US-scoped).
+ * True when the posting is in the United States.
+ * "US or Canada" stays (a US candidate can take it). Canada-only, UK, EMEA,
+ * worldwide, and a plain "Remote" with no country are dropped.
+ * Blank or plain "Remote" is kept only for sources whose search is already US-scoped.
+ * @param {{ location?: string, title?: string, source?: string }} job
  */
-export function isUsFriendlyLocation(location, title = "") {
-  const s = `${location || ""} ${title || ""}`.toLowerCase().trim();
-  if (!s) return true;
-  const hasUs = US_RE.test(s);
-  if (CANADA_RE.test(s) && !hasUs) return false;
-  if (hasUs) return true;
-  if (
-    /\b(worldwide|anywhere|global|north america|americas)\b/.test(s) &&
-    !/\b(emea|europe|india|uk[- ]only|latam)\b/.test(s)
-  ) {
-    return true;
-  }
-  if (/^remote\b/.test(s) && !/\b(emea|europe|india|uk|latam|apac)\b/.test(s)) {
-    return true;
-  }
-  if (OTHER_REGION_RE.test(s)) return false;
-  return true;
+export function isUsJobLocation(job) {
+  const location = job?.location;
+  const title = job?.title;
+  const source = String(job?.source || "").toLowerCase();
+  const text = locationText(location, title);
+  if (!text) return US_SCOPED_SOURCES.has(source);
+  const us = hasUsSignal(location, title);
+  if (NON_US_RE.test(text) && !us) return false;
+  if (us) return true;
+  if (isGenericRemoteLocation(location) && US_SCOPED_SOURCES.has(source)) return true;
+  return false;
+}
+
+/** @deprecated use isUsJobLocation */
+export function isUsFriendlyLocation(location, title = "", source = "") {
+  return isUsJobLocation({ location, title, source });
 }
 
 export function stripHtml(html) {

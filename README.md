@@ -11,8 +11,8 @@ Each run overwrites **one** combined CSV with the latest qualifying jobs from al
 
 Filter (applied to all sources):
 
-- **Keep:** **remote only** (Remote / Remote OK / Remote Solely — not hybrid or on-site) and title is an **AI Engineer / AI Developer** family role (`Senior AI Engineer`, `Full Stack AI Engineer`, `GenAI Engineer`, `Agentic AI Engineer`, `LLM Engineer`, `AI Developer`, …). Exact wording is not required. Posted within the last `RECENT_DAYS` days (default 3).
-- **Skip:** generic SWE/ML/scientist titles even if the JD mentions AI; non-eng “AI” titles (sales, recruiting, PM); **hybrid/on-site**; **LinkedIn** apply/redirect links; **expired / no-longer-available** postings; postings **older than `RECENT_DAYS`**.
+- **Keep:** **US remote only** (Remote / Remote OK / Remote Solely — not hybrid or on-site) and title is an **AI Engineer / AI Developer** family role (`Senior AI Engineer`, `Full Stack AI Engineer`, `GenAI Engineer`, `Agentic AI Engineer`, `LLM Engineer`, `AI Developer`, …). Location must be the United States (or a US state). Exact wording is not required. Posted within the last `RECENT_DAYS` days (default 3).
+- **Skip:** jobs outside the US (Canada-only, UK, EMEA, LATAM, worldwide/anywhere unless the posting also says US); generic SWE/ML/scientist titles even if the JD mentions AI; non-eng “AI” titles (sales, recruiting, PM); **hybrid/on-site**; **LinkedIn** apply/redirect links; **expired / no-longer-available** postings; postings **older than `RECENT_DAYS`**. A blank or plain "Remote" location is kept only for Dice, JobRight, and Built In, because those searches are already US-scoped.
 - **Skip (already applied):** jobs you've **already applied to** — JobRight via `POST /swan/job/applied/jobs-v3`, and **Dice** via the *My Jobs → Applied* tab (needs a saved Dice login, see below). Applied jobs are skipped during capture and removed from the local store each run.
 
 ## How automation is split (recommended)
